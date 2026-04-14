@@ -221,12 +221,15 @@ function AIAnalysisPanel({ stats }) {
   const [analyzing, setAnalyzing] = useState(false);
   const [error, setError] = useState(null);
   const [lastRun, setLastRun] = useState(null);
+  // ✅ FIX: patchResult moved here, into AIAnalysisPanel where it's used
+  const [patchResult, setPatchResult] = useState(null);
 
   const runAnalysis = async () => {
     console.log("🔥 BUTTON CLICKED");
     setAnalyzing(true);
     setError(null);
     setAnalysisResult(null);
+    setPatchResult(null);
 
     try {
       const res = await fetch('http://127.0.0.1:4000/api/analyze', {
@@ -243,6 +246,10 @@ function AIAnalysisPanel({ stats }) {
       }
 
       setAnalysisResult(json);
+      // If the API returns patch info, store it
+      if (json.patch) {
+        setPatchResult(json.patch);
+      }
       setLastRun(new Date());
     } catch (err) {
       setError(err.message);
@@ -251,9 +258,10 @@ function AIAnalysisPanel({ stats }) {
       setAnalyzing(false);
     }
   };
+
   // Pull data out of { success, data } envelope
-  const data =
-    analysisResult?.success ? analysisResult.data : null;
+  const data = analysisResult?.success ? analysisResult.data : null;
+
   // Severity badge style
   const sevStyle = (sev) => {
     const s = (sev || '').toUpperCase();
@@ -363,8 +371,6 @@ function AIAnalysisPanel({ stats }) {
               </div>
             )}
 
-            {/* ERRORS TABLE — full width */}
-            {/* ERRORS CARDS — full width */}
             {/* ERROR BLOCKS (SRE STYLE) */}
             {Array.isArray(data.errors) && data.errors.length > 0 && (
               <div style={{ ...styles.analysisCard, gridColumn: '1 / -1' }}>
@@ -384,12 +390,9 @@ function AIAnalysisPanel({ stats }) {
                         boxShadow: '0 0 30px rgba(0,220,155,0.05)',
                       }}
                     >
-
                       {/* HEADER */}
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-
-                          {/* INDEX */}
                           <div style={{
                             fontFamily: "'Orbitron', monospace",
                             color: '#00dc9b',
@@ -397,8 +400,6 @@ function AIAnalysisPanel({ stats }) {
                           }}>
                             {String(i + 1).padStart(2, '0')}
                           </div>
-
-                          {/* TITLE */}
                           <div style={{
                             fontFamily: "'Orbitron', monospace",
                             letterSpacing: 2,
@@ -408,8 +409,6 @@ function AIAnalysisPanel({ stats }) {
                             ERROR {err.code}
                           </div>
                         </div>
-
-                        {/* SEVERITY BADGE */}
                         <div style={{
                           ...sevStyle(err.severity),
                           padding: '4px 10px',
@@ -429,23 +428,8 @@ function AIAnalysisPanel({ stats }) {
                         gap: 12,
                         marginTop: 14
                       }}>
-
-                        <div style={{
-                          border: '1px solid rgba(0,220,155,0.1)',
-                          padding: 10,
-                          borderRadius: 6
-                        }}>
-
-                        </div>
-
-                        <div style={{
-                          border: '1px solid rgba(0,220,155,0.1)',
-                          padding: 10,
-                          borderRadius: 6
-                        }}>
-
-                        </div>
-
+                        <div style={{ border: '1px solid rgba(0,220,155,0.1)', padding: 10, borderRadius: 6 }} />
+                        <div style={{ border: '1px solid rgba(0,220,155,0.1)', padding: 10, borderRadius: 6 }} />
                       </div>
 
                       {/* WHAT'S WRONG */}
@@ -480,11 +464,32 @@ function AIAnalysisPanel({ stats }) {
                         </div>
                       </div>
 
+                      {/* AUTO PATCH OUTPUT */}
+                      {patchResult && (
+                        <div style={{
+                          ...styles.analysisCard,
+                          gridColumn: '1 / -1',
+                          border: '1px solid rgba(255, 165, 0, 0.3)',
+                          background: 'rgba(255, 165, 0, 0.05)',
+                          marginTop: 12,
+                        }}>
+                          <div style={styles.analysisCardLabel}>
+                            AUTO CODE PATCH APPLIED
+                          </div>
+                          <div style={{ marginTop: 10, fontFamily: 'monospace', fontSize: 12, color: '#ffb347' }}>
+                            FILE: {patchResult.file}
+                          </div>
+                          <div style={{ marginTop: 6, fontSize: 11, color: '#a8d8cc' }}>
+                            STATUS: {patchResult.applied ? "SUCCESS" : "FAILED"}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
               </div>
             )}
+
             {/* RECOMMENDATION — full width */}
             {data.recommendation && (
               <div style={{ ...styles.analysisCard, gridColumn: '1 / -1' }}>
@@ -531,7 +536,6 @@ const Dashboard = () => {
   const [rollbackHistory, setRollbackHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
-
   const [serverStart] = useState(() => Date.now());
   const [now, setNow] = useState(Date.now());
 
@@ -566,7 +570,6 @@ const Dashboard = () => {
     return () => clearInterval(iv);
   }, []);
 
-  // Fixed changeMode — no nested duplicate definition
   const changeMode = async (mode) => {
     await fetch('http://127.0.0.1:4000/api/config', {
       method: 'POST',
@@ -643,7 +646,7 @@ const Dashboard = () => {
           </div>
         )}
 
-        {/* 4. ── AI ANALYSIS PANEL (NEW) ── */}
+        {/* 4. AI ANALYSIS PANEL */}
         <AIAnalysisPanel stats={stats} />
 
         {/* 5. ANALYTICS & INSIGHTS */}
@@ -908,7 +911,6 @@ const styles = {
   },
   sectionLine: { flex: 1, height: 1, background: 'linear-gradient(90deg, #00dc9b10, transparent)' },
 
-  // AI Analysis specific
   analysisStatsRow: {
     display: 'flex', gap: 24, marginBottom: 20,
     paddingBottom: 16, borderBottom: '1px solid rgba(0,220,155,0.06)',
