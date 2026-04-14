@@ -16,7 +16,7 @@ const randomFail = () => Math.random() < 0.4;
 // ============================================
 app.get("/api", (req, res) => {
   if (randomFail()) {
-    return res.status(500).json({ 
+    return res.status(500).json({
       error: "Internal Server Error",
       message: "Database connection pool exhausted",
       timestamp: new Date().toISOString(),
@@ -36,7 +36,7 @@ app.get("/api", (req, res) => {
 
 // Connection Pool Exhausted
 app.get("/error/db-pool", (req, res) => {
-  res.status(503).json({ 
+  res.status(503).json({
     error: "Service Unavailable",
     message: "Database connection pool exhausted - all 50 connections in use",
     timestamp: new Date().toISOString(),
@@ -53,7 +53,7 @@ app.get("/error/db-pool", (req, res) => {
 // Query Timeout
 app.get("/error/query-timeout", (req, res) => {
   setTimeout(() => {
-    res.status(504).json({ 
+    res.status(504).json({
       error: "Gateway Timeout",
       message: "Query execution exceeded 30s timeout - SELECT * FROM large_table JOIN another_table",
       timestamp: new Date().toISOString(),
@@ -70,7 +70,7 @@ app.get("/error/query-timeout", (req, res) => {
 
 // Constraint Violation
 app.get("/error/constraint", (req, res) => {
-  res.status(409).json({ 
+  res.status(409).json({
     error: "Conflict",
     message: "Unique constraint violation on email field",
     timestamp: new Date().toISOString(),
@@ -85,7 +85,7 @@ app.get("/error/constraint", (req, res) => {
 
 // Deadlock
 app.get("/error/deadlock", (req, res) => {
-  res.status(500).json({ 
+  res.status(500).json({
     error: "Internal Server Error",
     message: "Deadlock detected - Transaction rolled back",
     timestamp: new Date().toISOString(),
@@ -100,7 +100,7 @@ app.get("/error/deadlock", (req, res) => {
 
 // Out of Disk Space
 app.get("/error/disk-space", (req, res) => {
-  res.status(507).json({ 
+  res.status(507).json({
     error: "Insufficient Storage",
     message: "Database disk space exhausted - cannot write data",
     timestamp: new Date().toISOString(),
@@ -115,7 +115,7 @@ app.get("/error/disk-space", (req, res) => {
 
 // Authentication Failed
 app.get("/error/auth-failed", (req, res) => {
-  res.status(401).json({ 
+  res.status(401).json({
     error: "Unauthorized",
     message: "Database authentication failed - invalid credentials for user 'dbuser'",
     timestamp: new Date().toISOString(),
@@ -135,7 +135,7 @@ app.get("/error/auth-failed", (req, res) => {
 
 // Memory Leak
 app.get("/error/memory", (req, res) => {
-  res.status(500).json({ 
+  res.status(500).json({
     error: "Internal Server Error",
     message: "Process out of memory - heap size exceeded 2GB limit",
     timestamp: new Date().toISOString(),
@@ -151,7 +151,7 @@ app.get("/error/memory", (req, res) => {
 
 // Unhandled Exception
 app.get("/error/exception", (req, res) => {
-  res.status(500).json({ 
+  res.status(500).json({
     error: "Internal Server Error",
     message: "TypeError: Cannot read property 'email' of undefined",
     timestamp: new Date().toISOString(),
@@ -166,7 +166,7 @@ app.get("/error/exception", (req, res) => {
 
 // Rate Limit
 app.get("/error/rate-limit", (req, res) => {
-  res.status(429).json({ 
+  res.status(429).json({
     error: "Too Many Requests",
     message: "Rate limit exceeded - 1000 requests per minute limit reached",
     timestamp: new Date().toISOString(),
@@ -181,7 +181,7 @@ app.get("/error/rate-limit", (req, res) => {
 
 // Validation Error
 app.get("/error/validation", (req, res) => {
-  res.status(400).json({ 
+  res.status(400).json({
     error: "Bad Request",
     message: "Validation failed: password must be at least 8 characters",
     timestamp: new Date().toISOString(),
@@ -201,7 +201,7 @@ app.get("/error/validation", (req, res) => {
 
 // External API Timeout
 app.get("/error/external-timeout", (req, res) => {
-  res.status(504).json({ 
+  res.status(504).json({
     error: "Gateway Timeout",
     message: "External payment API timeout after 10s - service.payment.com",
     timestamp: new Date().toISOString(),
@@ -216,7 +216,7 @@ app.get("/error/external-timeout", (req, res) => {
 
 // Cache Miss Cascade
 app.get("/error/cache-miss", (req, res) => {
-  res.status(500).json({ 
+  res.status(500).json({
     error: "Internal Server Error",
     message: "Redis cache connection failed - falling back to database caused slowdown",
     timestamp: new Date().toISOString(),
@@ -236,9 +236,9 @@ app.get("/error/cache-miss", (req, res) => {
 let cascadeCount = 0;
 app.get("/error/cascade", (req, res) => {
   cascadeCount++;
-  
+
   if (cascadeCount > 5) {
-    return res.status(503).json({ 
+    return res.status(503).json({
       error: "Service Unavailable",
       message: "System degradation - multiple service failures detected",
       timestamp: new Date().toISOString(),
@@ -254,7 +254,7 @@ app.get("/error/cascade", (req, res) => {
       }
     });
   }
-  
+
   res.json({ status: "ok", cascade_count: cascadeCount });
 });
 
@@ -263,7 +263,7 @@ app.get("/error/cascade", (req, res) => {
 // ============================================
 app.get("/error/slow-response", (req, res) => {
   setTimeout(() => {
-    res.status(504).json({ 
+    res.status(504).json({
       error: "Gateway Timeout",
       message: "Request timeout after 45s - processing complex analytics query",
       timestamp: new Date().toISOString(),
@@ -282,27 +282,27 @@ app.get("/error/slow-response", (req, res) => {
 // ============================================
 app.get("/error/partial", (req, res) => {
   const random = Math.random();
-  
+
   if (random < 0.3) {
-    return res.status(500).json({ 
+    return res.status(500).json({
       error: "Internal Server Error",
       message: "Database connection timeout - unable to execute query",
       timestamp: new Date().toISOString()
     });
   } else if (random < 0.6) {
-    return res.status(503).json({ 
+    return res.status(503).json({
       error: "Service Unavailable",
       message: "Service temporarily degraded - retry after 30 seconds",
       timestamp: new Date().toISOString()
     });
   } else if (random < 0.9) {
-    return res.status(429).json({ 
+    return res.status(429).json({
       error: "Too Many Requests",
       message: "Rate limit exceeded",
       timestamp: new Date().toISOString()
     });
   }
-  
+
   res.json({ status: "ok" });
 });
 
@@ -310,8 +310,8 @@ app.get("/error/partial", (req, res) => {
 // HEALTH CHECK
 // ============================================
 app.get("/health", (req, res) => {
-  res.json({ 
-    status: "healthy", 
+  res.json({
+    status: "healthy",
     backend: "test",
     timestamp: new Date().toISOString()
   });
