@@ -11,7 +11,7 @@ const AIAnalyzer = ({ logs, stats }) => {
     setError(null);
     setAnalysis(null);
     try {
-      const res = await fetch('http://127.0.0.1:4000/api/analyze', {
+      const res = await fetch('https://logwatch-proxy.onrender.com/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       });

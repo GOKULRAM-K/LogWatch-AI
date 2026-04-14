@@ -221,7 +221,6 @@ function AIAnalysisPanel({ stats }) {
   const [analyzing, setAnalyzing] = useState(false);
   const [error, setError] = useState(null);
   const [lastRun, setLastRun] = useState(null);
-  // ✅ FIX: patchResult moved here, into AIAnalysisPanel where it's used
   const [patchResult, setPatchResult] = useState(null);
 
   const runAnalysis = async () => {
@@ -232,7 +231,7 @@ function AIAnalysisPanel({ stats }) {
     setPatchResult(null);
 
     try {
-      const res = await fetch('http://127.0.0.1:4000/api/analyze', {
+      const res = await fetch('https://logwatch-proxy.onrender.com/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({})
@@ -246,7 +245,6 @@ function AIAnalysisPanel({ stats }) {
       }
 
       setAnalysisResult(json);
-      // If the API returns patch info, store it
       if (json.patch) {
         setPatchResult(json.patch);
       }
@@ -259,10 +257,8 @@ function AIAnalysisPanel({ stats }) {
     }
   };
 
-  // Pull data out of { success, data } envelope
   const data = analysisResult?.success ? analysisResult.data : null;
 
-  // Severity badge style
   const sevStyle = (sev) => {
     const s = (sev || '').toUpperCase();
     if (s === 'HIGH') return { color: '#ff3355', border: '1px solid rgba(255,51,85,0.35)', background: 'rgba(255,51,85,0.06)' };
@@ -281,7 +277,6 @@ function AIAnalysisPanel({ stats }) {
     <div style={styles.section}>
       <SectionHeader title="AI Analysis Engine" tag="GPT-AGENT" />
 
-      {/* Stats snapshot */}
       {stats && (
         <div style={styles.analysisStatsRow}>
           {[
@@ -297,7 +292,6 @@ function AIAnalysisPanel({ stats }) {
         </div>
       )}
 
-      {/* Button */}
       <button
         style={{ ...styles.analyzeBtn, ...(analyzing ? styles.analyzeBtnLoading : {}) }}
         onClick={runAnalysis}
@@ -318,7 +312,6 @@ function AIAnalysisPanel({ stats }) {
         </div>
       )}
 
-      {/* Error */}
       {error && (
         <div style={styles.analysisError}>
           <span style={{ color: '#ff3355', marginRight: 8 }}>⚠</span>
@@ -326,7 +319,6 @@ function AIAnalysisPanel({ stats }) {
         </div>
       )}
 
-      {/* Results */}
       {data && (
         <div style={styles.analysisResultWrap}>
           <div style={styles.analysisResultHeader}>
@@ -337,7 +329,6 @@ function AIAnalysisPanel({ stats }) {
 
           <div style={styles.analysisGrid}>
 
-            {/* RISK */}
             {data.risk && (
               <div style={styles.analysisCard}>
                 <div style={styles.analysisCardLabel}>RISK LEVEL</div>
@@ -352,7 +343,6 @@ function AIAnalysisPanel({ stats }) {
               </div>
             )}
 
-            {/* ACTIONS */}
             {Array.isArray(data.actions) && data.actions.length > 0 && (
               <div style={styles.analysisCard}>
                 <div style={styles.analysisCardLabel}>ACTIONS</div>
@@ -371,7 +361,6 @@ function AIAnalysisPanel({ stats }) {
               </div>
             )}
 
-            {/* ERROR BLOCKS (SRE STYLE) */}
             {Array.isArray(data.errors) && data.errors.length > 0 && (
               <div style={{ ...styles.analysisCard, gridColumn: '1 / -1' }}>
                 <div style={styles.analysisCardLabel}>
@@ -380,91 +369,56 @@ function AIAnalysisPanel({ stats }) {
 
                 <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 18 }}>
                   {data.errors.map((err, i) => (
-                    <div
-                      key={i}
-                      style={{
-                        border: '1px solid rgba(0,220,155,0.15)',
-                        borderRadius: 10,
-                        background: 'rgba(0, 0, 0, 0.35)',
-                        padding: 16,
-                        boxShadow: '0 0 30px rgba(0,220,155,0.05)',
-                      }}
-                    >
-                      {/* HEADER */}
+                    <div key={i} style={{
+                      border: '1px solid rgba(0,220,155,0.15)',
+                      borderRadius: 10,
+                      background: 'rgba(0, 0, 0, 0.35)',
+                      padding: 16,
+                      boxShadow: '0 0 30px rgba(0,220,155,0.05)',
+                    }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                          <div style={{
-                            fontFamily: "'Orbitron', monospace",
-                            color: '#00dc9b',
-                            fontSize: 14
-                          }}>
+                          <div style={{ fontFamily: "'Orbitron', monospace", color: '#00dc9b', fontSize: 14 }}>
                             {String(i + 1).padStart(2, '0')}
                           </div>
-                          <div style={{
-                            fontFamily: "'Orbitron', monospace",
-                            letterSpacing: 2,
-                            fontSize: 14,
-                            color: '#e5fff7'
-                          }}>
+                          <div style={{ fontFamily: "'Orbitron', monospace", letterSpacing: 2, fontSize: 14, color: '#e5fff7' }}>
                             ERROR {err.code}
                           </div>
                         </div>
                         <div style={{
                           ...sevStyle(err.severity),
-                          padding: '4px 10px',
-                          fontSize: 10,
-                          letterSpacing: 1,
-                          borderRadius: 4,
-                          fontFamily: 'monospace'
+                          padding: '4px 10px', fontSize: 10,
+                          letterSpacing: 1, borderRadius: 4, fontFamily: 'monospace'
                         }}>
                           {err.severity?.toUpperCase()}
                         </div>
                       </div>
 
-                      {/* META ROW (FREQUENCY + IMPACT) */}
-                      <div style={{
-                        display: 'grid',
-                        gridTemplateColumns: '1fr 1fr',
-                        gap: 12,
-                        marginTop: 14
-                      }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 14 }}>
                         <div style={{ border: '1px solid rgba(0,220,155,0.1)', padding: 10, borderRadius: 6 }} />
                         <div style={{ border: '1px solid rgba(0,220,155,0.1)', padding: 10, borderRadius: 6 }} />
                       </div>
 
-                      {/* WHAT'S WRONG */}
                       <div style={{
                         marginTop: 14,
                         border: '1px solid rgba(255, 51, 85, 0.25)',
                         background: 'rgba(255, 51, 85, 0.05)',
-                        borderRadius: 6,
-                        padding: 12
+                        borderRadius: 6, padding: 12
                       }}>
-                        <div style={{ fontSize: 10, color: '#ff3355', letterSpacing: 2 }}>
-                          WHAT'S WRONG
-                        </div>
-                        <div style={{ fontSize: 12, marginTop: 6, color: '#ffd6dc' }}>
-                          {err.cause ?? '—'}
-                        </div>
+                        <div style={{ fontSize: 10, color: '#ff3355', letterSpacing: 2 }}>WHAT'S WRONG</div>
+                        <div style={{ fontSize: 12, marginTop: 6, color: '#ffd6dc' }}>{err.cause ?? '—'}</div>
                       </div>
 
-                      {/* HOW TO FIX */}
                       <div style={{
                         marginTop: 10,
                         border: '1px solid rgba(0, 220, 155, 0.25)',
                         background: 'rgba(0, 220, 155, 0.05)',
-                        borderRadius: 6,
-                        padding: 12
+                        borderRadius: 6, padding: 12
                       }}>
-                        <div style={{ fontSize: 10, color: '#00dc9b', letterSpacing: 2 }}>
-                          HOW TO FIX
-                        </div>
-                        <div style={{ fontSize: 12, marginTop: 6, color: '#d6fff2' }}>
-                          {err.fix}
-                        </div>
+                        <div style={{ fontSize: 10, color: '#00dc9b', letterSpacing: 2 }}>HOW TO FIX</div>
+                        <div style={{ fontSize: 12, marginTop: 6, color: '#d6fff2' }}>{err.fix}</div>
                       </div>
 
-                      {/* AUTO PATCH OUTPUT */}
                       {patchResult && (
                         <div style={{
                           ...styles.analysisCard,
@@ -473,9 +427,7 @@ function AIAnalysisPanel({ stats }) {
                           background: 'rgba(255, 165, 0, 0.05)',
                           marginTop: 12,
                         }}>
-                          <div style={styles.analysisCardLabel}>
-                            AUTO CODE PATCH APPLIED
-                          </div>
+                          <div style={styles.analysisCardLabel}>AUTO CODE PATCH APPLIED</div>
                           <div style={{ marginTop: 10, fontFamily: 'monospace', fontSize: 12, color: '#ffb347' }}>
                             FILE: {patchResult.file}
                           </div>
@@ -490,7 +442,6 @@ function AIAnalysisPanel({ stats }) {
               </div>
             )}
 
-            {/* RECOMMENDATION — full width */}
             {data.recommendation && (
               <div style={{ ...styles.analysisCard, gridColumn: '1 / -1' }}>
                 <div style={styles.analysisCardLabel}>RECOMMENDATION</div>
@@ -500,7 +451,6 @@ function AIAnalysisPanel({ stats }) {
 
           </div>
 
-          {/* Raw JSON toggle */}
           <RawJsonToggle data={analysisResult} />
         </div>
       )}
@@ -513,10 +463,7 @@ function RawJsonToggle({ data }) {
   const [open, setOpen] = useState(false);
   return (
     <div style={{ marginTop: 16 }}>
-      <button
-        onClick={() => setOpen(o => !o)}
-        style={styles.rawToggleBtn}
-      >
+      <button onClick={() => setOpen(o => !o)} style={styles.rawToggleBtn}>
         {open ? '▾' : '▸'} RAW JSON RESPONSE
       </button>
       {open && (
@@ -539,22 +486,20 @@ const Dashboard = () => {
   const [serverStart] = useState(() => Date.now());
   const [now, setNow] = useState(Date.now());
 
-  // Uptime ticker
   useEffect(() => {
     const tick = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(tick);
   }, []);
 
-  // Data fetcher
   useEffect(() => {
     setTimeout(() => setMounted(true), 100);
     const fetchData = async () => {
       try {
         const [sR, lR, cR, rR] = await Promise.all([
-          fetch('http://127.0.0.1:4000/api/stats'),
-          fetch('http://127.0.0.1:4000/api/logs'),
-          fetch('http://127.0.0.1:4000/api/config'),
-          fetch('http://127.0.0.1:4000/api/rollback-history'),
+          fetch('https://logwatch-proxy.onrender.com/api/stats'),
+          fetch('https://logwatch-proxy.onrender.com/api/logs'),
+          fetch('https://logwatch-proxy.onrender.com/api/config'),
+          fetch('https://logwatch-proxy.onrender.com/api/rollback-history'),
         ]);
         setStats(await sR.json());
         setLogs((await lR.json()).logs || []);
@@ -571,18 +516,18 @@ const Dashboard = () => {
   }, []);
 
   const changeMode = async (mode) => {
-    await fetch('http://127.0.0.1:4000/api/config', {
+    await fetch('https://logwatch-proxy.onrender.com/api/config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ mode }),
     });
-    const res = await fetch('http://127.0.0.1:4000/api/config');
+    const res = await fetch('https://logwatch-proxy.onrender.com/api/config');
     const data = await res.json();
     setConfig(data);
   };
 
   const manualRollback = async () => {
-    await fetch('http://127.0.0.1:4000/api/rollback', { method: 'POST' });
+    await fetch('https://logwatch-proxy.onrender.com/api/rollback', { method: 'POST' });
     alert('Manual rollback triggered');
   };
 
@@ -610,7 +555,6 @@ const Dashboard = () => {
 
       <div style={{ ...styles.shell, opacity: mounted ? 1 : 0, transition: 'opacity 0.8s ease' }}>
 
-        {/* 1. AI LOG ANALYSIS ENGINE */}
         {logs.length > 0 && (
           <div style={styles.section}>
             <SectionHeader title="AI Log Analysis Engine" tag="NEURAL" />
@@ -618,7 +562,6 @@ const Dashboard = () => {
           </div>
         )}
 
-        {/* 3. CANARY DEPLOYMENT MATRIX (Header + Metrics) */}
         <header style={styles.header}>
           <div style={styles.headerGlow} />
           <div style={styles.headerLeft}>
@@ -646,13 +589,10 @@ const Dashboard = () => {
           </div>
         )}
 
-        {/* 4. AI ANALYSIS PANEL */}
         <AIAnalysisPanel stats={stats} />
 
-        {/* 5. ANALYTICS & INSIGHTS */}
         {logs.length > 0 && <Analytics logs={logs} stats={stats} />}
 
-        {/* 6. TRAFFIC MODE CONTROL */}
         {config && (
           <div style={styles.section}>
             <SectionHeader title="Traffic Mode Control" tag="LIVE" />
@@ -683,7 +623,6 @@ const Dashboard = () => {
           </div>
         )}
 
-        {/* 7. EMERGENCY ROLLBACK */}
         <div style={styles.section}>
           <SectionHeader title="Emergency Rollback" />
           <button style={styles.rollbackBtn} onClick={manualRollback}
@@ -696,7 +635,6 @@ const Dashboard = () => {
           <div style={styles.rollbackInfo}>AUTO-TRIGGER · threshold: error_rate &gt; 20%</div>
         </div>
 
-        {/* ROLLBACK HISTORY */}
         {rollbackHistory.length > 0 && (
           <div style={styles.section}>
             <SectionHeader title="Rollback History" tag={`${rollbackHistory.length} EVENTS`} />
@@ -719,7 +657,6 @@ const Dashboard = () => {
           </div>
         )}
 
-        {/* 8. RECENT REQUESTS */}
         {logs.length > 0 && (
           <div style={styles.section}>
             <SectionHeader title="Recent Requests" tag="LAST 10" />
@@ -733,8 +670,8 @@ const Dashboard = () => {
                       <td style={{ ...styles.td, color: '#a78bfa' }}>{log.method}</td>
                       <td style={{ ...styles.td, fontFamily: 'monospace', fontSize: 11 }}>{log.path}</td>
                       <td style={styles.td}><StatusBadge code={log.statusCode} /></td>
-                      <td style={{ ...styles.td, color: log.target?.includes('5001') ? '#00dc9b' : '#f59e0b' }}>
-                        {log.target?.includes('5001') ? 'stable' : 'canary'}
+                      <td style={{ ...styles.td, color: log.target?.includes('logwatch-stable') ? '#00dc9b' : '#f59e0b' }}>
+                        {log.target?.includes('logwatch-stable') ? 'stable' : 'canary'}
                       </td>
                       <td style={{ ...styles.td, color: '#00b4ff' }}>{log.duration}ms</td>
                     </tr>
@@ -745,7 +682,6 @@ const Dashboard = () => {
           </div>
         )}
 
-        {/* 9. FULL LOG STREAM */}
         {logs.length > 0 && (
           <div style={styles.section}>
             <SectionHeader title="Full Log Stream" tag={`${logs.length} ENTRIES`} />
@@ -759,8 +695,8 @@ const Dashboard = () => {
                       <td style={{ ...styles.td, color: '#a78bfa' }}>{log.method}</td>
                       <td style={{ ...styles.td, fontFamily: 'monospace', fontSize: 10 }}>{log.path}</td>
                       <td style={styles.td}><StatusBadge code={log.statusCode} /></td>
-                      <td style={{ ...styles.td, color: log.target?.includes('5001') ? '#00dc9b' : '#f59e0b' }}>
-                        {log.target?.includes('5001') ? 'stable' : 'canary'}
+                      <td style={{ ...styles.td, color: log.target?.includes('logwatch-stable') ? '#00dc9b' : '#f59e0b' }}>
+                        {log.target?.includes('logwatch-stable') ? 'stable' : 'canary'}
                       </td>
                       <td style={{ ...styles.td, color: '#00b4ff' }}>{log.duration}</td>
                       <td style={{ ...styles.td, color: '#5aaa88', fontSize: 10 }}>{log.ip}</td>
@@ -813,224 +749,68 @@ const globalStyles = `
 // ── Styles ────────────────────────────────────────────────────────────────
 const styles = {
   shell: {
-    position: 'relative',
-    zIndex: 1,
-    maxWidth: 1400,
-    margin: '0 auto',
-    padding: '100px 24px 60px',
-    fontFamily: "'Share Tech Mono', monospace",
-    color: '#8ecfbf',
+    position: 'relative', zIndex: 1, maxWidth: 1400,
+    margin: '0 auto', padding: '100px 24px 60px',
+    fontFamily: "'Share Tech Mono', monospace", color: '#8ecfbf',
   },
-  loading: {
-    position: 'fixed', inset: 0, zIndex: 10,
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-  },
+  loading: { position: 'fixed', inset: 0, zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' },
   loadingInner: { textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20 },
-  loadingSpinner: {
-    width: 48, height: 48, borderRadius: '50%',
-    border: '2px solid #00dc9b22', borderTop: '2px solid #00dc9b',
-    animation: 'spin 0.8s linear infinite',
-  },
+  loadingSpinner: { width: 48, height: 48, borderRadius: '50%', border: '2px solid #00dc9b22', borderTop: '2px solid #00dc9b', animation: 'spin 0.8s linear infinite' },
   loadingText: { fontFamily: "'Orbitron', monospace", fontSize: 13, letterSpacing: 6, color: '#00dc9b', textShadow: '0 0 20px #00dc9b' },
   loadingBar: { width: 200, height: 2, background: '#ffffff08', borderRadius: 1 },
   loadingFill: { height: '100%', background: '#00dc9b', borderRadius: 1, animation: 'fillBar 1.5s ease forwards' },
-
-  header: {
-    position: 'relative', display: 'flex', alignItems: 'center',
-    justifyContent: 'space-between', padding: '32px 0 24px', marginBottom: 8,
-  },
-  headerGlow: {
-    position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)',
-    width: '60%', height: 1, background: 'linear-gradient(90deg, transparent, #00dc9b33, transparent)',
-  },
+  header: { position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '32px 0 24px', marginBottom: 8 },
+  headerGlow: { position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)', width: '60%', height: 1, background: 'linear-gradient(90deg, transparent, #00dc9b33, transparent)' },
   headerLeft: { display: 'flex', alignItems: 'center', gap: 16 },
   headerHex: { fontSize: 42, color: '#00dc9b', animation: 'glowPulse 3s ease infinite' },
-  headerTitle: {
-    fontFamily: "'Orbitron', monospace", fontSize: 22, fontWeight: 900,
-    color: '#e8f8f4', letterSpacing: 4, textShadow: '0 0 40px rgba(0,220,155,0.3)',
-  },
+  headerTitle: { fontFamily: "'Orbitron', monospace", fontSize: 22, fontWeight: 900, color: '#e8f8f4', letterSpacing: 4, textShadow: '0 0 40px rgba(0,220,155,0.3)' },
   headerSub: { fontSize: 11, color: '#6ab8a8', letterSpacing: 2, marginTop: 4 },
   headerRight: { display: 'flex', alignItems: 'center', gap: 12 },
-  liveDot: {
-    width: 8, height: 8, borderRadius: '50%',
-    background: '#00dc9b', boxShadow: '0 0 12px #00dc9b',
-    animation: 'pulse 1.5s ease infinite',
-  },
+  liveDot: { width: 8, height: 8, borderRadius: '50%', background: '#00dc9b', boxShadow: '0 0 12px #00dc9b', animation: 'pulse 1.5s ease infinite' },
   liveText: { fontFamily: "'Orbitron', monospace", fontSize: 11, color: '#00dc9b', letterSpacing: 3 },
   headerDivider: { width: 1, height: 20, background: '#ffffff10' },
   headerTime: { fontSize: 12, color: '#6ab8a8', fontFamily: 'monospace' },
-  headerBorderBottom: {
-    position: 'absolute', bottom: 0, left: 0, right: 0, height: 1,
-    background: 'linear-gradient(90deg, transparent, #00dc9b15, #00b4ff15, transparent)',
-  },
-
-  metricsGrid: {
-    display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 32,
-  },
-  metricCard: {
-    position: 'relative', padding: '24px 20px',
-    background: 'rgba(0,8,16,0.4)',
-    border: '1px solid rgba(0,220,155,0.15)',
-    backdropFilter: 'blur(3px)',
-    WebkitBackdropFilter: 'blur(3px)',
-    display: 'flex', flexDirection: 'column', gap: 6,
-    animation: 'fadeUp 0.5s ease backwards',
-    overflow: 'hidden',
-  },
-  metricCornerTL: {
-    position: 'absolute', top: 0, left: 0, width: 12, height: 12,
-    borderTop: '2px solid var(--accent)', borderLeft: '2px solid var(--accent)',
-  },
-  metricCornerBR: {
-    position: 'absolute', bottom: 0, right: 0, width: 12, height: 12,
-    borderBottom: '2px solid var(--accent)', borderRight: '2px solid var(--accent)',
-  },
+  headerBorderBottom: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 1, background: 'linear-gradient(90deg, transparent, #00dc9b15, #00b4ff15, transparent)' },
+  metricsGrid: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 32 },
+  metricCard: { position: 'relative', padding: '24px 20px', background: 'rgba(0,8,16,0.4)', border: '1px solid rgba(0,220,155,0.15)', backdropFilter: 'blur(3px)', WebkitBackdropFilter: 'blur(3px)', display: 'flex', flexDirection: 'column', gap: 6, animation: 'fadeUp 0.5s ease backwards', overflow: 'hidden' },
+  metricCornerTL: { position: 'absolute', top: 0, left: 0, width: 12, height: 12, borderTop: '2px solid var(--accent)', borderLeft: '2px solid var(--accent)' },
+  metricCornerBR: { position: 'absolute', bottom: 0, right: 0, width: 12, height: 12, borderBottom: '2px solid var(--accent)', borderRight: '2px solid var(--accent)' },
   metricLabel: { fontSize: 10, letterSpacing: 3, color: '#6ab8a8', fontFamily: "'Orbitron', monospace" },
   metricValue: { fontSize: 36, fontFamily: "'Orbitron', monospace", fontWeight: 900, lineHeight: 1 },
   metricBar: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 2 },
-
-  section: {
-    marginBottom: 32, padding: 24,
-    background: 'rgba(0,5,12,0.45)',
-    border: '1px solid rgba(0,150,120,0.1)',
-    backdropFilter: 'blur(3px)',
-    WebkitBackdropFilter: 'blur(3px)',
-    animation: 'fadeUp 0.5s ease backwards',
-  },
-  sectionHeader: {
-    display: 'flex', alignItems: 'center', gap: 10,
-    marginBottom: 20, paddingBottom: 12,
-    borderBottom: '1px solid rgba(0,220,155,0.07)',
-  },
+  section: { marginBottom: 32, padding: 24, background: 'rgba(0,5,12,0.45)', border: '1px solid rgba(0,150,120,0.1)', backdropFilter: 'blur(3px)', WebkitBackdropFilter: 'blur(3px)', animation: 'fadeUp 0.5s ease backwards' },
+  sectionHeader: { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20, paddingBottom: 12, borderBottom: '1px solid rgba(0,220,155,0.07)' },
   sectionSlash: { color: '#00dc9b', fontFamily: "'Orbitron', monospace", fontSize: 14 },
   sectionTitle: { fontFamily: "'Orbitron', monospace", fontSize: 13, color: '#b8e8d8', letterSpacing: 2 },
-  sectionTag: {
-    fontSize: 9, letterSpacing: 2, padding: '3px 8px',
-    border: '1px solid #00dc9b33', color: '#00dc9b',
-    fontFamily: "'Orbitron', monospace",
-  },
+  sectionTag: { fontSize: 9, letterSpacing: 2, padding: '3px 8px', border: '1px solid #00dc9b33', color: '#00dc9b', fontFamily: "'Orbitron', monospace" },
   sectionLine: { flex: 1, height: 1, background: 'linear-gradient(90deg, #00dc9b10, transparent)' },
-
-  analysisStatsRow: {
-    display: 'flex', gap: 24, marginBottom: 20,
-    paddingBottom: 16, borderBottom: '1px solid rgba(0,220,155,0.06)',
-  },
-  analysisStat: {
-    display: 'flex', flexDirection: 'column', gap: 4,
-    padding: '10px 16px',
-    background: 'rgba(0,220,155,0.03)',
-    border: '1px solid rgba(0,220,155,0.08)',
-  },
-  analyzeBtn: {
-    display: 'flex', alignItems: 'center', gap: 12,
-    padding: '16px 32px', marginBottom: 12,
-    background: 'rgba(0,220,155,0.05)',
-    border: '1px solid #00dc9b44', color: '#00dc9b',
-    cursor: 'pointer', fontFamily: "'Share Tech Mono', monospace", fontSize: 14,
-    letterSpacing: 1, boxShadow: '0 0 20px #00dc9b22',
-    transition: 'box-shadow 0.2s ease',
-  },
-  analyzeBtnLoading: {
-    opacity: 0.7, cursor: 'not-allowed',
-    border: '1px solid #00dc9b22',
-  },
-  btnSpinner: {
-    width: 16, height: 16, borderRadius: '50%',
-    border: '2px solid #00dc9b22', borderTop: '2px solid #00dc9b',
-    animation: 'spin 0.7s linear infinite', flexShrink: 0,
-  },
-  analysisError: {
-    padding: '12px 16px', marginBottom: 16,
-    background: 'rgba(255,51,85,0.05)',
-    border: '1px solid rgba(255,51,85,0.2)',
-    color: '#ff3355', fontSize: 12, fontFamily: 'monospace',
-  },
-  analysisResultWrap: {
-    animation: 'slideIn 0.4s ease',
-    marginTop: 8,
-  },
-  analysisResultHeader: {
-    display: 'flex', alignItems: 'center', gap: 8,
-    fontFamily: "'Orbitron', monospace", fontSize: 11,
-    color: '#00dc9b', letterSpacing: 2,
-    marginBottom: 16, paddingBottom: 10,
-    borderBottom: '1px solid rgba(0,220,155,0.08)',
-  },
-  analysisGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-    gap: 12,
-  },
-  analysisCard: {
-    padding: '14px 16px',
-    background: 'rgba(0,220,155,0.03)',
-    border: '1px solid rgba(0,220,155,0.1)',
-  },
-  analysisCardLabel: {
-    fontSize: 9, letterSpacing: 2, color: '#4a9888',
-    fontFamily: "'Orbitron', monospace", marginBottom: 6,
-  },
-  analysisSummaryText: {
-    fontSize: 13, color: '#a8d8cc', lineHeight: 1.7,
-    fontFamily: "'Share Tech Mono', monospace",
-    borderLeft: '2px solid #00dc9b33', paddingLeft: 12, marginTop: 6,
-  },
-  rawToggleBtn: {
-    background: 'none', border: '1px solid rgba(0,220,155,0.15)',
-    color: '#4a9888', cursor: 'pointer', fontFamily: 'monospace',
-    fontSize: 11, padding: '6px 12px', letterSpacing: 1,
-    transition: 'color 0.2s',
-  },
-  rawJson: {
-    marginTop: 8, padding: 16,
-    background: 'rgba(0,0,0,0.4)',
-    border: '1px solid rgba(0,220,155,0.08)',
-    color: '#5aaa88', fontSize: 11, fontFamily: 'monospace',
-    overflowX: 'auto', maxHeight: 320, overflowY: 'auto',
-    lineHeight: 1.5,
-  },
-
+  analysisStatsRow: { display: 'flex', gap: 24, marginBottom: 20, paddingBottom: 16, borderBottom: '1px solid rgba(0,220,155,0.06)' },
+  analysisStat: { display: 'flex', flexDirection: 'column', gap: 4, padding: '10px 16px', background: 'rgba(0,220,155,0.03)', border: '1px solid rgba(0,220,155,0.08)' },
+  analyzeBtn: { display: 'flex', alignItems: 'center', gap: 12, padding: '16px 32px', marginBottom: 12, background: 'rgba(0,220,155,0.05)', border: '1px solid #00dc9b44', color: '#00dc9b', cursor: 'pointer', fontFamily: "'Share Tech Mono', monospace", fontSize: 14, letterSpacing: 1, boxShadow: '0 0 20px #00dc9b22', transition: 'box-shadow 0.2s ease' },
+  analyzeBtnLoading: { opacity: 0.7, cursor: 'not-allowed', border: '1px solid #00dc9b22' },
+  btnSpinner: { width: 16, height: 16, borderRadius: '50%', border: '2px solid #00dc9b22', borderTop: '2px solid #00dc9b', animation: 'spin 0.7s linear infinite', flexShrink: 0 },
+  analysisError: { padding: '12px 16px', marginBottom: 16, background: 'rgba(255,51,85,0.05)', border: '1px solid rgba(255,51,85,0.2)', color: '#ff3355', fontSize: 12, fontFamily: 'monospace' },
+  analysisResultWrap: { animation: 'slideIn 0.4s ease', marginTop: 8 },
+  analysisResultHeader: { display: 'flex', alignItems: 'center', gap: 8, fontFamily: "'Orbitron', monospace", fontSize: 11, color: '#00dc9b', letterSpacing: 2, marginBottom: 16, paddingBottom: 10, borderBottom: '1px solid rgba(0,220,155,0.08)' },
+  analysisGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 },
+  analysisCard: { padding: '14px 16px', background: 'rgba(0,220,155,0.03)', border: '1px solid rgba(0,220,155,0.1)' },
+  analysisCardLabel: { fontSize: 9, letterSpacing: 2, color: '#4a9888', fontFamily: "'Orbitron', monospace", marginBottom: 6 },
+  analysisSummaryText: { fontSize: 13, color: '#a8d8cc', lineHeight: 1.7, fontFamily: "'Share Tech Mono', monospace", borderLeft: '2px solid #00dc9b33', paddingLeft: 12, marginTop: 6 },
+  rawToggleBtn: { background: 'none', border: '1px solid rgba(0,220,155,0.15)', color: '#4a9888', cursor: 'pointer', fontFamily: 'monospace', fontSize: 11, padding: '6px 12px', letterSpacing: 1, transition: 'color 0.2s' },
+  rawJson: { marginTop: 8, padding: 16, background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(0,220,155,0.08)', color: '#5aaa88', fontSize: 11, fontFamily: 'monospace', overflowX: 'auto', maxHeight: 320, overflowY: 'auto', lineHeight: 1.5 },
   modeGrid: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 16 },
-  modeBtn: {
-    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
-    padding: '20px 16px',
-    background: 'rgba(255,255,255,0.02)',
-    border: '1px solid rgba(255,255,255,0.08)',
-    color: '#7ecfbe', cursor: 'pointer',
-    transition: 'all 0.2s ease', fontFamily: 'monospace',
-  },
+  modeBtn: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: '20px 16px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', color: '#7ecfbe', cursor: 'pointer', transition: 'all 0.2s ease', fontFamily: 'monospace' },
   modeStatus: { fontSize: 11, color: '#5aaa88', letterSpacing: 2, fontFamily: 'monospace' },
-
-  rollbackBtn: {
-    display: 'flex', alignItems: 'center', gap: 12,
-    padding: '16px 32px', marginBottom: 12,
-    background: 'rgba(255,51,85,0.05)',
-    border: '1px solid #ff335544', color: '#ff3355',
-    cursor: 'pointer', fontFamily: "'Share Tech Mono', monospace", fontSize: 14,
-    letterSpacing: 1, boxShadow: '0 0 20px #ff335522',
-    transition: 'box-shadow 0.2s ease',
-  },
+  rollbackBtn: { display: 'flex', alignItems: 'center', gap: 12, padding: '16px 32px', marginBottom: 12, background: 'rgba(255,51,85,0.05)', border: '1px solid #ff335544', color: '#ff3355', cursor: 'pointer', fontFamily: "'Share Tech Mono', monospace", fontSize: 14, letterSpacing: 1, boxShadow: '0 0 20px #ff335522', transition: 'box-shadow 0.2s ease' },
   rollbackInfo: { fontSize: 11, color: '#5a7888', letterSpacing: 2, fontFamily: 'monospace' },
-
   tableWrap: { overflowX: 'auto' },
   table: { width: '100%', borderCollapse: 'collapse', fontSize: 12 },
-  th: {
-    padding: '10px 12px', textAlign: 'left',
-    fontFamily: "'Orbitron', monospace", fontSize: 9, letterSpacing: 2,
-    color: '#4a9888', borderBottom: '1px solid rgba(0,220,155,0.08)',
-    fontWeight: 400,
-  },
+  th: { padding: '10px 12px', textAlign: 'left', fontFamily: "'Orbitron', monospace", fontSize: 9, letterSpacing: 2, color: '#4a9888', borderBottom: '1px solid rgba(0,220,155,0.08)', fontWeight: 400 },
   tr: { borderBottom: '1px solid rgba(255,255,255,0.03)', transition: 'background 0.15s' },
   trError: { background: 'rgba(255,51,85,0.04)' },
   td: { padding: '10px 12px', color: '#8ecfbf', verticalAlign: 'middle' },
   badge: { padding: '2px 8px', fontSize: 11, fontFamily: 'monospace', display: 'inline-block' },
-
-  footer: {
-    textAlign: 'center', padding: '24px 0',
-    fontSize: 10, letterSpacing: 4, color: '#3a8878',
-    fontFamily: "'Orbitron', monospace",
-    borderTop: '1px solid rgba(0,220,155,0.05)',
-  },
+  footer: { textAlign: 'center', padding: '24px 0', fontSize: 10, letterSpacing: 4, color: '#3a8878', fontFamily: "'Orbitron', monospace", borderTop: '1px solid rgba(0,220,155,0.05)' },
 };
 
 export default Dashboard;

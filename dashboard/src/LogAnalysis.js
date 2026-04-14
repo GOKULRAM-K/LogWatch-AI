@@ -14,7 +14,7 @@ function clusterLogs(logs) {
     }
     clusters[key].count++;
     clusters[key].lastSeen = log.timestamp;
-    if (log.target?.includes('5001')) clusters[key].backends.add('Stable');
+    if (log.target?.includes('logwatch-stable')) clusters[key].backends.add('Stable');
     else clusters[key].backends.add('Test');
     clusters[key].paths.add(log.path || '/api');
   });
@@ -60,14 +60,14 @@ function parseRawLogs(text) {
     try {
       const obj = JSON.parse(line);
       if (obj.statusCode || obj.status || obj.level) {
-        parsed.push({ timestamp: obj.timestamp || obj.time || new Date().toISOString(), method: obj.method || 'GET', path: obj.path || obj.url || '/api', statusCode: parseInt(obj.statusCode || obj.status || (obj.level === 'error' ? 500 : 200)), duration: obj.duration || obj.responseTime || 0, target: obj.target || (obj.backend === 'stable' ? 'http://127.0.0.1:5001' : 'http://127.0.0.1:5002'), ip: obj.ip || '127.0.0.1', responseBody: obj.responseBody || obj.message || obj.msg || 'parsed' });
+        parsed.push({ timestamp: obj.timestamp || obj.time || new Date().toISOString(), method: obj.method || 'GET', path: obj.path || obj.url || '/api', statusCode: parseInt(obj.statusCode || obj.status || (obj.level === 'error' ? 500 : 200)), duration: obj.duration || obj.responseTime || 0, target: obj.target || (obj.backend === 'stable' ? 'https://logwatch-stable.onrender.com' : 'https://logwatch-test.onrender.com'), ip: obj.ip || '127.0.0.1', responseBody: obj.responseBody || obj.message || obj.msg || 'parsed' });
         return;
       }
     } catch (_) {}
     const apacheMatch = line.match(/(\S+)\s+\S+\s+\S+\s+\[(.+?)\]\s+"(\w+)\s+(\S+)[^"]*"\s+(\d{3})\s+(\d+|-)/);
-    if (apacheMatch) { parsed.push({ timestamp: new Date().toISOString(), method: apacheMatch[3], path: apacheMatch[4], statusCode: parseInt(apacheMatch[5]), duration: 0, target: 'http://127.0.0.1:5001', ip: apacheMatch[1], responseBody: `Status ${apacheMatch[5]}` }); return; }
+    if (apacheMatch) { parsed.push({ timestamp: new Date().toISOString(), method: apacheMatch[3], path: apacheMatch[4], statusCode: parseInt(apacheMatch[5]), duration: 0, target: 'https://logwatch-stable.onrender.com', ip: apacheMatch[1], responseBody: `Status ${apacheMatch[5]}` }); return; }
     const simpleMatch = line.match(/\[?(ERROR|WARN|INFO|SUCCESS)\]?\s+\[?(\d{3})\]?\s+(\w+)\s+(\S+)/i);
-    if (simpleMatch) { parsed.push({ timestamp: new Date().toISOString(), method: simpleMatch[3], path: simpleMatch[4], statusCode: parseInt(simpleMatch[2]), duration: 0, target: 'http://127.0.0.1:5001', ip: '127.0.0.1', responseBody: line }); }
+    if (simpleMatch) { parsed.push({ timestamp: new Date().toISOString(), method: simpleMatch[3], path: simpleMatch[4], statusCode: parseInt(simpleMatch[2]), duration: 0, target: 'https://logwatch-stable.onrender.com', ip: '127.0.0.1', responseBody: line }); }
   });
   return parsed;
 }
@@ -139,7 +139,7 @@ const LogAnalysis = ({ logs: liveLogs = [] }) => {
     setAiSummary('');
     if (workingLogs.length === 0) { setAiError('No logs to analyse.'); setAiLoading(false); return; }
     try {
-      const response = await fetch('http://127.0.0.1:4000/api/analyze-logs', {
+      const response = await fetch('https://logwatch-proxy.onrender.com/api/analyze-logs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ logs: workingLogs }),
@@ -164,8 +164,6 @@ const LogAnalysis = ({ logs: liveLogs = [] }) => {
         <p className="la-subtitle">Ingest logs → detect patterns → cluster failures → AI incident summary</p>
       </div>
 
-      
-
       {activeTab === 'paste' && (
         <div className="la-input-panel">
           <div className="la-upload-row">
@@ -175,7 +173,7 @@ const LogAnalysis = ({ logs: liveLogs = [] }) => {
           </div>
           <textarea
             className="la-textarea"
-            placeholder={`Paste JSON log lines here, one per line. Example:\n{"timestamp":"2026-03-28T10:00:01Z","method":"GET","path":"/api","statusCode":500,"duration":45,"target":"http://127.0.0.1:5002","ip":"127.0.0.1","responseBody":"Database connection pool exhausted"}`}
+            placeholder={`Paste JSON log lines here, one per line. Example:\n{"timestamp":"2026-03-28T10:00:01Z","method":"GET","path":"/api","statusCode":500,"duration":45,"target":"https://logwatch-test.onrender.com","ip":"127.0.0.1","responseBody":"Database connection pool exhausted"}`}
             value={pastedText}
             onChange={e => setPastedText(e.target.value)}
             rows={8}
