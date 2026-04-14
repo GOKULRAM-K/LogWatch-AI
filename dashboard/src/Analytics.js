@@ -156,7 +156,6 @@ const Analytics = ({ logs }) => {
 
       <div className="charts-grid">
 
-        {/* ERROR PIE */}
         <div className="chart-card" data-depth="1">
           <h3>Error Distribution</h3>
           {errorDistribution.length === 0 ? (
@@ -175,7 +174,6 @@ const Analytics = ({ logs }) => {
           )}
         </div>
 
-        {/* TIMELINE */}
         <div className="chart-card" data-depth="1">
           <h3>Error Rate Timeline</h3>
           {timeline.length === 0 ? (
@@ -199,7 +197,6 @@ const Analytics = ({ logs }) => {
           )}
         </div>
 
-        {/* STABLE VS CANARY */}
         <div className="chart-card" data-depth="1">
           <h3>Stable vs Canary Error Rate</h3>
           <ResponsiveContainer width="100%" height={220}>
@@ -217,7 +214,6 @@ const Analytics = ({ logs }) => {
           </ResponsiveContainer>
         </div>
 
-        {/* SEVERITY */}
         <div className="chart-card" data-depth="1">
           <h3>Severity Breakdown</h3>
           {severity.length === 0 ? (

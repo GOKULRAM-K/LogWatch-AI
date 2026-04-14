@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Analytics from './Analytics';
 import LogAnalysis from './LogAnalysis';
 
-// ── Cursor-reactive 3D background ────────────────────────────────────────
 function CursorBackground() {
   const canvasRef = useRef(null);
   const mouse = useRef({ x: 0.5, y: 0.5 });
@@ -131,8 +130,8 @@ function CursorBackground() {
       t++;
       animRef.current = requestAnimationFrame(draw);
     };
+    animRef.current = requestAnimationFrame(draw);
 
-    draw();
     return () => {
       cancelAnimationFrame(animRef.current);
       window.removeEventListener('resize', resize);
@@ -140,71 +139,28 @@ function CursorBackground() {
     };
   }, []);
 
-  return (
-    <canvas
-      ref={canvasRef}
-      style={{
-        position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
-        zIndex: 0, pointerEvents: 'none',
-      }}
-    />
-  );
+  return <canvas ref={canvasRef} style={{ position: 'fixed', inset: 0, zIndex: 0 }} />;
 }
 
-// ── Tilt hook ─────────────────────────────────────────────────────────────
-function useTilt(strength = 8) {
-  const ref = useRef(null);
-  const onMove = useCallback((e) => {
-    const el = ref.current;
-    if (!el) return;
-    const r = el.getBoundingClientRect();
-    const dx = (e.clientX - r.left - r.width / 2) / (r.width / 2);
-    const dy = (e.clientY - r.top - r.height / 2) / (r.height / 2);
-    el.style.transform = `perspective(800px) rotateY(${dx * strength}deg) rotateX(${-dy * strength}deg) translateZ(8px)`;
-  }, [strength]);
-  const onLeave = useCallback(() => {
-    if (ref.current) ref.current.style.transform = 'perspective(800px) rotateY(0deg) rotateX(0deg) translateZ(0px)';
-  }, []);
-  return { ref, onMouseMove: onMove, onMouseLeave: onLeave };
-}
-
-// ── Metric Card ───────────────────────────────────────────────────────────
-function MetricCard({ label, value, accent, delay, icon }) {
-  const tilt = useTilt(5);
-  return (
-    <div {...tilt} style={{
-      ...styles.metricCard,
-      animationDelay: delay,
-      '--accent': accent,
-      transition: 'transform 0.15s ease',
-    }}>
-      <div style={styles.metricCornerTL} />
-      <div style={styles.metricCornerBR} />
-      <div style={{ color: accent, fontSize: 22, marginBottom: 6 }}>{icon}</div>
-      <div style={styles.metricLabel}>{label}</div>
-      <div style={{ ...styles.metricValue, color: accent, textShadow: `0 0 30px ${accent}` }}>
-        {value}
-      </div>
-      <div style={{ ...styles.metricBar, background: `linear-gradient(90deg, ${accent}33, transparent)` }} />
-    </div>
-  );
-}
-
-// ── Status Badge ──────────────────────────────────────────────────────────
 function StatusBadge({ code }) {
-  const color = code >= 500 ? '#ff3355' : code >= 400 ? '#ff8800' : code >= 300 ? '#f59e0b' : '#00dc9b';
-  return (
-    <span style={{
-      ...styles.badge,
-      color,
-      border: `1px solid ${color}44`,
-      background: `${color}0d`,
-      textShadow: `0 0 8px ${color}`,
-    }}>{code}</span>
-  );
+  const colors = {
+    200: '#00ff88', 201: '#00ff88', 204: '#00ff88',
+    301: '#f59e0b', 302: '#f59e0b', 304: '#f59e0b',
+    400: '#ff9933', 401: '#ff3355', 403: '#ff3355', 404: '#ff9933', 409: '#ff9933', 429: '#ff6644',
+    500: '#ff4444', 502: '#ff4444', 503: '#ff4444', 504: '#ff6644',
+  };
+  const color = colors[code] || '#00b4ff';
+  return <span style={{
+    padding: '2px 8px', borderRadius: 2, fontFamily: 'monospace', fontSize: 10, fontWeight: 600,
+    border: `1px solid ${color}88`,
+    color: color,
+    border: `1px solid ${color}44`,
+    background: `${color}0d`,
+    textShadow: `0 0 8px ${color}`,
+  }}>{code}</span>
+  ;
 }
 
-// ── Section Header ────────────────────────────────────────────────────────
 function SectionHeader({ title, tag }) {
   return (
     <div style={styles.sectionHeader}>
@@ -218,478 +174,304 @@ function SectionHeader({ title, tag }) {
 
 function AIAnalysisPanel({ stats }) {
   const [analysisResult, setAnalysisResult] = useState(null);
-  const [analyzing, setAnalyzing] = useState(false);
-  const [error, setError] = useState(null);
-  const [lastRun, setLastRun] = useState(null);
-  const [patchResult, setPatchResult] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [showRaw, setShowRaw] = useState(false);
 
-  const runAnalysis = async () => {
-    console.log("🔥 BUTTON CLICKED");
-    setAnalyzing(true);
-    setError(null);
+  const runAnalysis = useCallback(async () => {
+    if (!stats?.logs || stats.logs.length === 0) {
+      setError('No logs available for analysis');
+      return;
+    }
+    setLoading(true);
+    setError('');
     setAnalysisResult(null);
-    setPatchResult(null);
-
     try {
-      const res = await fetch('https://logwatch-proxy.onrender.com/api/analyze', {
+      const response = await fetch('https://logwatch-proxy.onrender.com/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({})
+        body: JSON.stringify({ logs: stats.logs }),
       });
-
-      const json = await res.json();
-      console.log("ANALYSIS RESPONSE:", json);
-
-      if (!res.ok || !json.success) {
-        throw new Error(json.message || `HTTP ${res.status}`);
-      }
-
-      setAnalysisResult(json);
-      if (json.patch) {
-        setPatchResult(json.patch);
-      }
-      setLastRun(new Date());
+      if (!response.ok) throw new Error(`Server error: ${response.status}`);
+      const data = await response.json();
+      if (data.error) throw new Error(data.error);
+      setAnalysisResult(data);
     } catch (err) {
-      setError(err.message);
-      console.error(err);
+      setError(`Analysis failed: ${err.message}`);
+      console.error('[AIAnalysisPanel]', err);
     } finally {
-      setAnalyzing(false);
+      setLoading(false);
     }
-  };
-
-  const data = analysisResult?.success ? analysisResult.data : null;
-
-  const sevStyle = (sev) => {
-    const s = (sev || '').toUpperCase();
-    if (s === 'HIGH') return { color: '#ff3355', border: '1px solid rgba(255,51,85,0.35)', background: 'rgba(255,51,85,0.06)' };
-    if (s === 'MEDIUM') return { color: '#f59e0b', border: '1px solid rgba(245,158,11,0.35)', background: 'rgba(245,158,11,0.06)' };
-    return { color: '#00dc9b', border: '1px solid rgba(0,220,155,0.35)', background: 'rgba(0,220,155,0.06)' };
-  };
-
-  const riskStyle = (risk) => {
-    const r = (risk || '').toUpperCase();
-    if (r === 'HIGH') return { color: '#ff3355', border: '1px solid rgba(255,51,85,0.4)', background: 'rgba(255,51,85,0.07)' };
-    if (r === 'MEDIUM') return { color: '#f59e0b', border: '1px solid rgba(245,158,11,0.4)', background: 'rgba(245,158,11,0.07)' };
-    return { color: '#00dc9b', border: '1px solid rgba(0,220,155,0.4)', background: 'rgba(0,220,155,0.07)' };
-  };
+  }, [stats]);
 
   return (
     <div style={styles.section}>
-      <SectionHeader title="AI Analysis Engine" tag="GPT-AGENT" />
-
-      {stats && (
-        <div style={styles.analysisStatsRow}>
-          {[
-            { label: 'TOTAL REQ', value: stats.totalRequests, color: '#00dc9b' },
-            { label: 'ERRORS', value: stats.totalErrors, color: '#ff3355' },
-            { label: 'ERROR RATE', value: stats.errorRatePercent, color: '#f59e0b' },
-          ].map(({ label, value, color }) => (
-            <div key={label} style={styles.analysisStat}>
-              <span style={{ color: '#4a9888', fontSize: 10, letterSpacing: 2, fontFamily: "'Orbitron', monospace" }}>{label}</span>
-              <span style={{ color, fontSize: 18, fontFamily: "'Orbitron', monospace", fontWeight: 900 }}>{value ?? '—'}</span>
-            </div>
-          ))}
+      <SectionHeader title="AI Analysis Engine" tag="GROQ" />
+      <div style={styles.analysisStatsRow}>
+        <div style={styles.analysisStat}>
+          <span style={{ fontSize: 11, color: '#4a9888', letterSpacing: 2 }}>TOTAL REQUESTS</span>
+          <span style={{ fontSize: 18, fontWeight: 900, color: '#00dc9b' }}>{stats?.totalRequests || 0}</span>
         </div>
-      )}
-
-      <button
-        style={{ ...styles.analyzeBtn, ...(analyzing ? styles.analyzeBtnLoading : {}) }}
-        onClick={runAnalysis}
-        disabled={analyzing}
-        onMouseEnter={e => { if (!analyzing) e.currentTarget.style.boxShadow = '0 0 40px #00dc9b55, inset 0 0 30px #00dc9b0d'; }}
-        onMouseLeave={e => { e.currentTarget.style.boxShadow = '0 0 20px #00dc9b22'; }}
-      >
-        {analyzing ? (
-          <><div style={styles.btnSpinner} /><span style={{ fontFamily: "'Orbitron', monospace", letterSpacing: 2 }}>ANALYZING...</span></>
-        ) : (
-          <><span style={{ fontSize: 18 }}>⬡</span><span style={{ fontFamily: "'Orbitron', monospace", letterSpacing: 2 }}>RUN AI ANALYSIS</span></>
-        )}
+        <div style={styles.analysisStat}>
+          <span style={{ fontSize: 11, color: '#4a9888', letterSpacing: 2 }}>ERROR RATE</span>
+          <span style={{ fontSize: 18, fontWeight: 900, color: stats?.errorRate > 20 ? '#ff3355' : '#00dc9b' }}>
+            {(stats?.errorRate || 0).toFixed(1)}%
+          </span>
+        </div>
+        <div style={styles.analysisStat}>
+          <span style={{ fontSize: 11, color: '#4a9888', letterSpacing: 2 }}>ERROR COUNT</span>
+          <span style={{ fontSize: 18, fontWeight: 900, color: stats?.errorCount > 0 ? '#ff9933' : '#00dc9b' }}>
+            {stats?.errorCount || 0}
+          </span>
+        </div>
+        <div style={styles.analysisStat}>
+          <span style={{ fontSize: 11, color: '#4a9888', letterSpacing: 2 }}>MODE</span>
+          <span style={{ fontSize: 18, fontWeight: 900, color: '#f59e0b' }}>
+            {stats?.mode || 'stable'}
+          </span>
+        </div>
+      </div>
+      <button style={loading ? { ...styles.analyzeBtn, ...styles.analyzeBtnLoading } : styles.analyzeBtn} onClick={runAnalysis} disabled={loading}>
+        {loading ? <div style={styles.btnSpinner} /> : null}
+        {loading ? 'ANALYZING WITH GROQ...' : '✨ RUN AI ANALYSIS'}
       </button>
-
-      {lastRun && (
-        <div style={{ fontSize: 10, color: '#3a8878', letterSpacing: 2, marginBottom: 16, fontFamily: 'monospace' }}>
-          LAST_RUN: {lastRun.toLocaleTimeString()}
-        </div>
-      )}
-
-      {error && (
-        <div style={styles.analysisError}>
-          <span style={{ color: '#ff3355', marginRight: 8 }}>⚠</span>
-          ANALYSIS_FAILED: {error}
-        </div>
-      )}
-
-      {data && (
+      {error && <div style={styles.analysisError}>{error}</div>}
+      {analysisResult && (
         <div style={styles.analysisResultWrap}>
           <div style={styles.analysisResultHeader}>
-            <span style={{ color: '#00dc9b' }}>✓</span>
-            ANALYSIS COMPLETE
-            <div style={{ flex: 1, height: 1, background: 'linear-gradient(90deg, #00dc9b22, transparent)', marginLeft: 16 }} />
+            <span>📋 INCIDENT REPORT</span>
+            <button style={styles.rawToggleBtn} onClick={() => setShowRaw(!showRaw)}>
+              {showRaw ? 'Hide JSON' : 'Show JSON'}
+            </button>
           </div>
-
           <div style={styles.analysisGrid}>
-
-            {data.risk && (
-              <div style={styles.analysisCard}>
-                <div style={styles.analysisCardLabel}>RISK LEVEL</div>
-                <span style={{
-                  ...riskStyle(data.risk),
-                  display: 'inline-block', marginTop: 6,
-                  padding: '3px 12px', fontSize: 12,
-                  fontFamily: "'Orbitron', monospace", letterSpacing: 2,
-                }}>
-                  {data.risk.toUpperCase()}
-                </span>
+            <div style={styles.analysisCard}>
+              <div style={styles.analysisCardLabel}>PRIMARY ERROR</div>
+              <div style={{ fontSize: 13, color: '#ff3355', fontWeight: 600 }}>
+                {analysisResult.primary_error || 'Unknown'}
               </div>
-            )}
-
-            {Array.isArray(data.actions) && data.actions.length > 0 && (
-              <div style={styles.analysisCard}>
-                <div style={styles.analysisCardLabel}>ACTIONS</div>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 6 }}>
-                  {data.actions.map((action, i) => (
-                    <span key={i} style={{
-                      padding: '4px 12px', fontSize: 10,
-                      fontFamily: 'monospace', letterSpacing: 1,
-                      border: '1px solid rgba(0,180,255,0.3)',
-                      color: '#00b4ff', background: 'rgba(0,180,255,0.06)',
-                    }}>
-                      {action}
-                    </span>
-                  ))}
-                </div>
+            </div>
+            <div style={styles.analysisCard}>
+              <div style={styles.analysisCardLabel}>ROOT CAUSE</div>
+              <div style={{ fontSize: 13, color: '#a8d8cc' }}>
+                {analysisResult.root_cause || 'Analysis in progress'}
               </div>
-            )}
-
-            {Array.isArray(data.errors) && data.errors.length > 0 && (
-              <div style={{ ...styles.analysisCard, gridColumn: '1 / -1' }}>
-                <div style={styles.analysisCardLabel}>
-                  ERRORS DETECTED ({data.errors.length})
-                </div>
-
-                <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 18 }}>
-                  {data.errors.map((err, i) => (
-                    <div key={i} style={{
-                      border: '1px solid rgba(0,220,155,0.15)',
-                      borderRadius: 10,
-                      background: 'rgba(0, 0, 0, 0.35)',
-                      padding: 16,
-                      boxShadow: '0 0 30px rgba(0,220,155,0.05)',
-                    }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                          <div style={{ fontFamily: "'Orbitron', monospace", color: '#00dc9b', fontSize: 14 }}>
-                            {String(i + 1).padStart(2, '0')}
-                          </div>
-                          <div style={{ fontFamily: "'Orbitron', monospace", letterSpacing: 2, fontSize: 14, color: '#e5fff7' }}>
-                            ERROR {err.code}
-                          </div>
-                        </div>
-                        <div style={{
-                          ...sevStyle(err.severity),
-                          padding: '4px 10px', fontSize: 10,
-                          letterSpacing: 1, borderRadius: 4, fontFamily: 'monospace'
-                        }}>
-                          {err.severity?.toUpperCase()}
-                        </div>
-                      </div>
-
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 14 }}>
-                        <div style={{ border: '1px solid rgba(0,220,155,0.1)', padding: 10, borderRadius: 6 }} />
-                        <div style={{ border: '1px solid rgba(0,220,155,0.1)', padding: 10, borderRadius: 6 }} />
-                      </div>
-
-                      <div style={{
-                        marginTop: 14,
-                        border: '1px solid rgba(255, 51, 85, 0.25)',
-                        background: 'rgba(255, 51, 85, 0.05)',
-                        borderRadius: 6, padding: 12
-                      }}>
-                        <div style={{ fontSize: 10, color: '#ff3355', letterSpacing: 2 }}>WHAT'S WRONG</div>
-                        <div style={{ fontSize: 12, marginTop: 6, color: '#ffd6dc' }}>{err.cause ?? '—'}</div>
-                      </div>
-
-                      <div style={{
-                        marginTop: 10,
-                        border: '1px solid rgba(0, 220, 155, 0.25)',
-                        background: 'rgba(0, 220, 155, 0.05)',
-                        borderRadius: 6, padding: 12
-                      }}>
-                        <div style={{ fontSize: 10, color: '#00dc9b', letterSpacing: 2 }}>HOW TO FIX</div>
-                        <div style={{ fontSize: 12, marginTop: 6, color: '#d6fff2' }}>{err.fix}</div>
-                      </div>
-
-                      {patchResult && (
-                        <div style={{
-                          ...styles.analysisCard,
-                          gridColumn: '1 / -1',
-                          border: '1px solid rgba(255, 165, 0, 0.3)',
-                          background: 'rgba(255, 165, 0, 0.05)',
-                          marginTop: 12,
-                        }}>
-                          <div style={styles.analysisCardLabel}>AUTO CODE PATCH APPLIED</div>
-                          <div style={{ marginTop: 10, fontFamily: 'monospace', fontSize: 12, color: '#ffb347' }}>
-                            FILE: {patchResult.file}
-                          </div>
-                          <div style={{ marginTop: 6, fontSize: 11, color: '#a8d8cc' }}>
-                            STATUS: {patchResult.applied ? "SUCCESS" : "FAILED"}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
+            </div>
+            <div style={styles.analysisCard}>
+              <div style={styles.analysisCardLabel}>RECOMMENDED ACTION</div>
+              <div style={{ fontSize: 13, color: '#00dc9b' }}>
+                {analysisResult.recommended_action || 'Monitor'}
               </div>
-            )}
-
-            {data.recommendation && (
-              <div style={{ ...styles.analysisCard, gridColumn: '1 / -1' }}>
-                <div style={styles.analysisCardLabel}>RECOMMENDATION</div>
-                <div style={styles.analysisSummaryText}>{data.recommendation}</div>
+            </div>
+            <div style={styles.analysisCard}>
+              <div style={styles.analysisCardLabel}>RISK LEVEL</div>
+              <div style={{ fontSize: 13, color: analysisResult.risk_level === 'CRITICAL' ? '#ff3355' : analysisResult.risk_level === 'HIGH' ? '#ff9933' : '#00dc9b' }}>
+                {analysisResult.risk_level || 'LOW'}
               </div>
-            )}
-
+            </div>
           </div>
-
-          <RawJsonToggle data={analysisResult} />
+          <div style={styles.analysisSummaryText}>
+            <strong>Summary:</strong> {analysisResult.summary || 'No summary available'}
+          </div>
+          {showRaw && (
+            <div style={styles.rawJson}>
+              {JSON.stringify(analysisResult, null, 2)}
+            </div>
+          )}
         </div>
       )}
     </div>
   );
 }
 
-// ── Raw JSON collapsible ──────────────────────────────────────────────────
-function RawJsonToggle({ data }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <div style={{ marginTop: 16 }}>
-      <button onClick={() => setOpen(o => !o)} style={styles.rawToggleBtn}>
-        {open ? '▾' : '▸'} RAW JSON RESPONSE
-      </button>
-      {open && (
-        <pre style={styles.rawJson}>
-          {JSON.stringify(data, null, 2)}
-        </pre>
-      )}
-    </div>
-  );
-}
-
-// ── Main Dashboard ────────────────────────────────────────────────────────
 const Dashboard = () => {
-  const [stats, setStats] = useState(null);
-  const [logs, setLogs] = useState([]);
-  const [config, setConfig] = useState(null);
-  const [rollbackHistory, setRollbackHistory] = useState([]);
+  const [stats, setStats] = useState({
+    totalRequests: 0,
+    totalErrors: 0,
+    errorRate: 0,
+    uptime: '0h',
+    mode: 'stable',
+    logs: [],
+    rollbacks: [],
+    errorCount: 0,
+  });
   const [loading, setLoading] = useState(true);
-  const [mounted, setMounted] = useState(false);
-  const [serverStart] = useState(() => Date.now());
-  const [now, setNow] = useState(Date.now());
+  const [manualRollback, setManualRollback] = useState(false);
 
   useEffect(() => {
-    const tick = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(tick);
-  }, []);
-
-  useEffect(() => {
-    setTimeout(() => setMounted(true), 100);
-    const fetchData = async () => {
+    const fetchStats = async () => {
       try {
-        const [sR, lR, cR, rR] = await Promise.all([
-          fetch('https://logwatch-proxy.onrender.com/api/stats'),
-          fetch('https://logwatch-proxy.onrender.com/api/logs'),
-          fetch('https://logwatch-proxy.onrender.com/api/config'),
-          fetch('https://logwatch-proxy.onrender.com/api/rollback-history'),
-        ]);
-        setStats(await sR.json());
-        setLogs((await lR.json()).logs || []);
-        setConfig(await cR.json());
-        setRollbackHistory((await rR.json()).history || []);
+        const resp = await fetch('https://logwatch-proxy.onrender.com/api/stats', { method: 'GET' });
+        if (resp.ok) {
+          const data = await resp.json();
+          setStats(prev => ({
+            ...prev,
+            ...data,
+            errorRate: data.totalRequests > 0 ? ((data.totalErrors || 0) / data.totalRequests) * 100 : 0,
+            errorCount: data.totalErrors || 0,
+          }));
+        }
+      } catch (e) {
+        console.error('[Stats fetch]', e);
+      } finally {
         setLoading(false);
-      } catch (err) {
-        console.error('Fetch error:', err);
       }
     };
-    fetchData();
-    const iv = setInterval(fetchData, 2000);
-    return () => clearInterval(iv);
+
+    fetchStats();
+    const interval = setInterval(fetchStats, 2000);
+    return () => clearInterval(interval);
   }, []);
 
-  const changeMode = async (mode) => {
-    await fetch('https://logwatch-proxy.onrender.com/api/config', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ mode }),
-    });
-    const res = await fetch('https://logwatch-proxy.onrender.com/api/config');
-    const data = await res.json();
-    setConfig(data);
+  const setMode = async (newMode) => {
+    try {
+      const resp = await fetch('https://logwatch-proxy.onrender.com/api/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: newMode }),
+      });
+      if (resp.ok) {
+        setStats(prev => ({ ...prev, mode: newMode }));
+      }
+    } catch (e) {
+      console.error('[setMode error]', e);
+    }
   };
 
-  const manualRollback = async () => {
-    await fetch('https://logwatch-proxy.onrender.com/api/rollback', { method: 'POST' });
-    alert('Manual rollback triggered');
+  const triggerRollback = async () => {
+    setManualRollback(true);
+    try {
+      await fetch('https://logwatch-proxy.onrender.com/api/rollback', { method: 'POST' });
+      setStats(prev => ({ ...prev, mode: 'stable' }));
+    } catch (e) {
+      console.error('[Rollback error]', e);
+    } finally {
+      setManualRollback(false);
+    }
   };
 
-  const uptimeMs = now - serverStart;
-  const uptimeMin = Math.floor(uptimeMs / 60000);
-  const uptimeSec = Math.floor((uptimeMs % 60000) / 1000);
-
-  if (loading) return (
-    <>
-      <CursorBackground />
+  if (loading) {
+    return (
       <div style={styles.loading}>
         <div style={styles.loadingInner}>
           <div style={styles.loadingSpinner} />
-          <div style={styles.loadingText}>INITIALIZING SYSTEMS</div>
+          <div style={styles.loadingText}>LOGWATCHAI</div>
           <div style={styles.loadingBar}><div style={styles.loadingFill} /></div>
         </div>
       </div>
-    </>
-  );
+    );
+  }
 
   return (
     <>
       <style>{globalStyles}</style>
       <CursorBackground />
+      <div style={styles.shell}>
 
-      <div style={{ ...styles.shell, opacity: mounted ? 1 : 0, transition: 'opacity 0.8s ease' }}>
-
-        {logs.length > 0 && (
-          <div style={styles.section}>
-            <SectionHeader title="AI Log Analysis Engine" tag="NEURAL" />
-            <LogAnalysis logs={logs} stats={stats} />
-          </div>
-        )}
-
-        <header style={styles.header}>
+        <div style={styles.header}>
           <div style={styles.headerGlow} />
           <div style={styles.headerLeft}>
-            <div style={styles.headerHex}>⬡</div>
+            <div style={styles.headerHex}>◆</div>
             <div>
-              <div style={styles.headerTitle}>CANARY DEPLOYMENT MATRIX</div>
-              <div style={styles.headerSub}>Real-time infrastructure monitoring · v2.4.1</div>
+              <div style={styles.headerTitle}>LOGWATCHAI</div>
+              <div style={styles.headerSub}>LIVE CANARY MONITORING + AI AGENTS</div>
             </div>
           </div>
           <div style={styles.headerRight}>
             <div style={styles.liveDot} />
-            <span style={styles.liveText}>LIVE</span>
+            <div style={styles.liveText}>LIVE</div>
             <div style={styles.headerDivider} />
-            <span style={styles.headerTime}>{new Date().toLocaleTimeString()}</span>
+            <div style={styles.headerTime}>{new Date().toLocaleTimeString()}</div>
           </div>
           <div style={styles.headerBorderBottom} />
-        </header>
+        </div>
 
-        {stats && (
-          <div style={styles.metricsGrid}>
-            <MetricCard label="TOTAL REQUESTS" value={stats.totalRequests} accent="#00dc9b" delay="0s" icon="⬡" />
-            <MetricCard label="TOTAL ERRORS" value={stats.totalErrors} accent="#ff3355" delay="0.1s" icon="⚠" />
-            <MetricCard label="ERROR RATE" value={stats.errorRatePercent} accent="#f59e0b" delay="0.2s" icon="%" />
-            <MetricCard label="UPTIME" value={`${uptimeMin}m ${uptimeSec}s`} accent="#00b4ff" delay="0.3s" icon="◈" />
-          </div>
-        )}
+        <div style={styles.metricsGrid}>
+          {[
+            { label: 'TOTAL REQUESTS', value: stats.totalRequests, color: '#00dc9b' },
+            { label: 'ERROR RATE', value: `${stats.errorRate.toFixed(1)}%`, color: stats.errorRate > 20 ? '#ff3355' : '#00dc9b' },
+            { label: 'ERRORS', value: stats.errorCount, color: stats.errorCount > 0 ? '#ff9933' : '#00dc9b' },
+            { label: 'MODE', value: stats.mode.toUpperCase(), color: '#f59e0b' },
+          ].map((m, i) => (
+            <div key={i} style={{ ...styles.metricCard, '--accent': m.color }}>
+              <div style={styles.metricCornerTL} />
+              <div style={styles.metricCornerBR} />
+              <div style={styles.metricLabel}>{m.label}</div>
+              <div style={{ ...styles.metricValue, color: m.color }}>{m.value}</div>
+              <div style={{ ...styles.metricBar, background: m.color }} />
+            </div>
+          ))}
+        </div>
 
         <AIAnalysisPanel stats={stats} />
 
-        {logs.length > 0 && <Analytics logs={logs} stats={stats} />}
-
-        {config && (
-          <div style={styles.section}>
-            <SectionHeader title="Traffic Mode Control" tag="LIVE" />
-            <div style={styles.modeGrid}>
-              {[
-                { key: 'stable', label: 'STABLE', sub: '90% traffic', icon: '✓', color: '#00dc9b' },
-                { key: 'test', label: 'TEST', sub: '100% canary', icon: '⚡', color: '#f59e0b' },
-                { key: 'canary', label: 'CANARY', sub: '10% canary', icon: '◈', color: '#00b4ff' },
-              ].map(m => (
-                <button key={m.key} onClick={() => changeMode(m.key)} style={{
-                  ...styles.modeBtn,
-                  ...(config.mode === m.key ? {
-                    background: `${m.color}10`,
-                    border: `1px solid ${m.color}`,
-                    color: m.color,
-                    boxShadow: `0 0 24px ${m.color}33, inset 0 0 24px ${m.color}08`,
-                  } : {}),
-                }}>
-                  <span style={{ fontSize: 20 }}>{m.icon}</span>
-                  <span style={{ fontFamily: "'Orbitron', monospace", fontSize: 12, letterSpacing: 3 }}>{m.label}</span>
-                  <span style={{ fontSize: 10, opacity: 0.6, fontFamily: 'monospace' }}>{m.sub}</span>
-                </button>
-              ))}
-            </div>
-            <div style={styles.modeStatus}>
-              ACTIVE_MODE: <span style={{ color: '#00dc9b' }}>{config.mode.toUpperCase()}</span>
-            </div>
-          </div>
-        )}
-
         <div style={styles.section}>
-          <SectionHeader title="Emergency Rollback" />
-          <button style={styles.rollbackBtn} onClick={manualRollback}
-            onMouseEnter={e => e.currentTarget.style.boxShadow = '0 0 40px #ff335566, inset 0 0 40px #ff335511'}
-            onMouseLeave={e => e.currentTarget.style.boxShadow = '0 0 20px #ff335522'}
-          >
-            <span style={{ fontSize: 18 }}>⏮</span>
-            <span style={{ fontFamily: "'Orbitron', monospace", letterSpacing: 2 }}>EXECUTE ROLLBACK → STABLE</span>
+          <SectionHeader title="Traffic Mode" tag="CONFIG" />
+          <div style={styles.modeGrid}>
+            {['stable', 'canary', 'test'].map(m => (
+              <button
+                key={m}
+                onClick={() => setMode(m)}
+                style={{
+                  ...styles.modeBtn,
+                  background: stats.mode === m ? 'rgba(0,220,155,0.1)' : 'rgba(255,255,255,0.02)',
+                  border: stats.mode === m ? '1px solid #00dc9b' : '1px solid rgba(255,255,255,0.08)',
+                  color: stats.mode === m ? '#00dc9b' : '#7ecfbe',
+                }}
+              >
+                <div style={{ fontSize: 14, fontWeight: 900 }}>{m.toUpperCase()}</div>
+                <div style={styles.modeStatus}>
+                  {m === 'stable' && '100% Stable'}
+                  {m === 'test' && '100% Canary'}
+                  {m === 'canary' && '90/10 Split'}
+                </div>
+              </button>
+            ))}
+          </div>
+          <button onClick={triggerRollback} style={styles.rollbackBtn} disabled={manualRollback}>
+            {manualRollback ? '⏳ ROLLING BACK...' : '🚨 EMERGENCY ROLLBACK'}
           </button>
-          <div style={styles.rollbackInfo}>AUTO-TRIGGER · threshold: error_rate &gt; 20%</div>
+          <div style={styles.rollbackInfo}>Triggers automatic rollback to stable server</div>
         </div>
 
-        {rollbackHistory.length > 0 && (
-          <div style={styles.section}>
-            <SectionHeader title="Rollback History" tag={`${rollbackHistory.length} EVENTS`} />
+        <div style={styles.section}>
+          <SectionHeader title="Rollback History" tag={`${stats.rollbacks?.length || 0}`} />
+          {stats.rollbacks && stats.rollbacks.length > 0 ? (
             <div style={styles.tableWrap}>
               <table style={styles.table}>
-                <thead><tr>{['TIMESTAMP', 'FROM', 'TO', 'ERROR RATE', 'TRIGGER'].map(h => <th key={h} style={styles.th}>{h}</th>)}</tr></thead>
+                <thead><tr>{['TIME', 'REASON', 'FROM', 'TO'].map(h => <th key={h} style={styles.th}>{h}</th>)}</tr></thead>
                 <tbody>
-                  {rollbackHistory.slice(-10).reverse().map((ev, i) => (
+                  {stats.rollbacks.map((r, i) => (
                     <tr key={i} style={styles.tr}>
-                      <td style={styles.td}>{new Date(ev.timestamp).toLocaleTimeString()}</td>
-                      <td style={{ ...styles.td, color: '#f59e0b' }}>{ev.previousMode}</td>
-                      <td style={{ ...styles.td, color: '#00dc9b', fontWeight: 700 }}>{ev.newMode}</td>
-                      <td style={{ ...styles.td, color: '#ff3355' }}>{ev.errorRate}%</td>
-                      <td style={{ ...styles.td, color: '#a78bfa' }}>AUTO</td>
+                      <td style={styles.td}>{new Date(r.timestamp).toLocaleTimeString()}</td>
+                      <td style={styles.td}>{r.reason || 'Manual'}</td>
+                      <td style={styles.td}>{r.from}</td>
+                      <td style={{ ...styles.td, color: '#00dc9b' }}>{r.to}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-          </div>
+          ) : (
+            <div style={{ padding: 20, textAlign: 'center', color: '#4a9888' }}>No rollbacks yet ✅</div>
+          )}
+        </div>
+
+        {stats.logs && stats.logs.length > 0 && (
+          <>
+            <Analytics logs={stats.logs} />
+            <LogAnalysis logs={stats.logs} />
+          </>
         )}
 
-        {logs.length > 0 && (
+        {stats.logs && stats.logs.length > 0 && (
           <div style={styles.section}>
-            <SectionHeader title="Recent Requests" tag="LAST 10" />
+            <SectionHeader title="Recent Requests" tag={`${stats.logs.length}`} />
             <div style={styles.tableWrap}>
-              <table style={styles.table}>
-                <thead><tr>{['TIME', 'METHOD', 'PATH', 'STATUS', 'BACKEND', 'DURATION'].map(h => <th key={h} style={styles.th}>{h}</th>)}</tr></thead>
-                <tbody>
-                  {logs.slice(-10).reverse().map((log, i) => (
-                    <tr key={i} style={{ ...styles.tr, ...(log.statusCode >= 400 ? styles.trError : {}) }}>
-                      <td style={styles.td}>{new Date(log.timestamp).toLocaleTimeString()}</td>
-                      <td style={{ ...styles.td, color: '#a78bfa' }}>{log.method}</td>
-                      <td style={{ ...styles.td, fontFamily: 'monospace', fontSize: 11 }}>{log.path}</td>
-                      <td style={styles.td}><StatusBadge code={log.statusCode} /></td>
-                      <td style={{ ...styles.td, color: log.target?.includes('logwatch-stable') ? '#00dc9b' : '#f59e0b' }}>
-                        {log.target?.includes('logwatch-stable') ? 'stable' : 'canary'}
-                      </td>
-                      <td style={{ ...styles.td, color: '#00b4ff' }}>{log.duration}ms</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {logs.length > 0 && (
-          <div style={styles.section}>
-            <SectionHeader title="Full Log Stream" tag={`${logs.length} ENTRIES`} />
-            <div style={{ ...styles.tableWrap, maxHeight: 340, overflowY: 'auto' }}>
               <table style={styles.table}>
                 <thead><tr>{['TIME', 'METHOD', 'PATH', 'STATUS', 'BACKEND', 'MS', 'IP', 'RESPONSE'].map(h => <th key={h} style={styles.th}>{h}</th>)}</tr></thead>
                 <tbody>
-                  {logs.map((log, i) => (
+                  {stats.logs.map((log, i) => (
                     <tr key={i} style={{ ...styles.tr, ...(log.statusCode >= 400 ? styles.trError : {}) }}>
                       <td style={styles.td}>{new Date(log.timestamp).toLocaleTimeString()}</td>
                       <td style={{ ...styles.td, color: '#a78bfa' }}>{log.method}</td>
@@ -719,7 +501,6 @@ const Dashboard = () => {
   );
 };
 
-// ── Global CSS ────────────────────────────────────────────────────────────
 const globalStyles = `
   @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap');
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -746,7 +527,6 @@ const globalStyles = `
   }
 `;
 
-// ── Styles ────────────────────────────────────────────────────────────────
 const styles = {
   shell: {
     position: 'relative', zIndex: 1, maxWidth: 1400,
