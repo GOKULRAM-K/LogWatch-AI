@@ -18,7 +18,7 @@ const { runAnalysisAgent } = require("./agents/analysis-agent");
 const { getAIState } = require("./agents/ai-state");
 
 const app = express();
-const proxy = httpProxy.createProxyServer({});
+const proxy = httpProxy.createProxyServer({ changeOrigin: true });
 
 // ================= INIT =================
 const logger = new EnhancedLogger();
@@ -172,7 +172,6 @@ app.post("/api/analyze", async (req, res) => {
     if (patch?.file) {
       console.log("🧠 Patch generated for:", patch.file);
 
-      // VALIDATE PATCH (IMPORTANT FIX)
       if (!isValidPatch(patch)) {
         console.log("❌ Invalid patch rejected");
         return res.json({
@@ -182,16 +181,11 @@ app.post("/api/analyze", async (req, res) => {
         });
       }
 
-      // SAFETY CHECKPOINT
       createCheckpoint();
-
-      // APPLY PATCH
       applyPatch(patch);
-
       console.log("🩹 Patch applied successfully");
     }
 
-    // ================= FINAL RESPONSE =================
     res.json({
       success: true,
       data: analysis,
@@ -210,7 +204,7 @@ app.post("/api/analyze", async (req, res) => {
 });
 
 // ================= PROXY RESPONSE CAPTURE =================
-proxy.on("proxyRes", (proxyRes, req) => {
+proxy.on("proxyRes", (proxyRes, req, res) => {
   let body = [];
 
   proxyRes.on("data", (chunk) => body.push(chunk));
@@ -238,7 +232,7 @@ app.use((req, res) => {
         : config.stable_url
       : config.stable_url;
 
-proxy.web(req, res, { target, changeOrigin: true });
+  proxy.web(req, res, { target, changeOrigin: true });
 
   res.on("finish", async () => {
     const duration = Date.now() - req.startTime;
@@ -261,7 +255,6 @@ proxy.web(req, res, { target, changeOrigin: true });
 
     console.log("📊 Error Rate:", errorRate);
 
-    // ingest logs
     if (res.statusCode >= 400) {
       const logEntry = {
         statusCode: res.statusCode,
@@ -276,7 +269,6 @@ proxy.web(req, res, { target, changeOrigin: true });
       }
     }
 
-    // trigger agent
     try {
       await triggerAgent.observe({
         statusCode: res.statusCode,
