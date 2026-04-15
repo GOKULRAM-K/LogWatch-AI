@@ -97,6 +97,18 @@ app.get("/error/partial", (req, res) => {
 app.get("/health", (req, res) => {
   res.json({ status: "healthy", backend: "test", timestamp: new Date().toISOString() });
 });
+// ========== CATCH ALL OTHER ROUTES ==========
+app.all("*", (req, res) => {
+  if (Math.random() < 0.4) {
+    return res.status(500).json({
+      error: "Internal Server Error",
+      message: "Database connection pool exhausted",
+      timestamp: new Date().toISOString(),
+      details: { pool_size: 10, active_connections: 10, waiting: 5 }
+    });
+  }
+  res.json({ status: "ok", backend: "test", latency: Math.random() * 100 });
+});
 
 const PORT = process.env.PORT || 5002;
 app.listen(PORT, () => {
