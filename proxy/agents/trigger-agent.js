@@ -2,8 +2,9 @@ const { retrieveRelevantLogs } = require("../rag/retriever");
 const { runExecutionAgent } = require("./execute-actions");
 
 class TriggerAgent {
-  constructor(errorTracker, config = {}) {
+  constructor(errorTracker, autoRollback, config = {}) {
     this.errorTracker = errorTracker;
+    this.autoRollback = autoRollback; // ✅ FIX
     this.errorThreshold = config.errorThreshold || 20;
     this.minRequests = config.minRequests || 20;
     this.cooldownMs = config.cooldownMs || 60000;
@@ -14,116 +15,84 @@ class TriggerAgent {
   async observe(log) {
     try {
       const stats = this.errorTracker.getStats();
-      const errorRate = parseFloat(
-        stats.errorRatePercent || stats.errorRate || 0
-      );
+      const errorRate = parseFloat(stats.errorRatePercent || 0);
 
-      // ⛔ not enough traffic
-      if (stats.totalRequests < this.minRequests) return null;
+      if (stats.totalRequests < this.minRequests) return;
 
-      // ⛔ below threshold
-      if (errorRate < this.errorThreshold) return null;
+      if (errorRate < this.errorThreshold) return;
 
-      // ⛔ cooldown
-      if (Date.now() - this.lastRun < this.cooldownMs) return null;
+      if (Date.now() - this.lastRun < this.cooldownMs) return;
 
       console.log("🤖 TriggerAgent activated");
 
       this.lastRun = Date.now();
 
-      let logs = await retrieveRelevantLogs(
-        "errors failures crashes 500 502 503 timeout"
-      );
+      let logs = await retrieveRelevantLogs("errors failures 500 502 503");
 
-      if (!logs || logs.length === 0) return null;
+      // ✅ FIX: don't stop
+      if (!logs || logs.length === 0) {
+        logs = [{ statusCode: 500, path: "/api" }];
+      }
 
       const ai = await this.callAI(logs, errorRate);
 
-      if (!ai) return null;
+      if (!ai) return;
 
       console.log("🧠 Agent Decision:", ai);
 
-      // ⚙️ EXECUTE ACTIONS
+      // ✅ FIX: pass correct autoRollback
       await runExecutionAgent({
         actions: ai.actions,
         errorRate,
-        autoRollback: log.autoRollback,
+        autoRollback: this.autoRollback,
       });
 
-      // 🚨 IMPORTANT: RETURN DECISION TO SERVER
-      return this.mapDecision(ai, errorRate);
+      return ai;
 
     } catch (err) {
       console.error("[TRIGGER AGENT ERROR]", err.message);
-      return null;
     }
   }
 
- mapDecision(ai, errorRate) {
-  if (ai.actions?.includes("ROLLBACK")) {
-    return {
-      action: "ROLLBACK_TO_STABLE",   // ← was ROLLBACK_TO_TEST (wrong!)
-      reason: ai.recommendation || "AI detected failure spike",
-      errorRate,
-    };
-  }
-
-  return { action: "NO_ACTION", errorRate };
-}
-
   async callAI(logs, errorRate) {
     try {
-    const prompt = `
-You are an autonomous SRE agent. Error rate is ${errorRate}%.
+      const prompt = `
+Error rate: ${errorRate}%.
 
-Rules:
-- If error rate > 20% → actions must include "ROLLBACK"
-- If error rate < 10% → actions must be ["IGNORE"]
-- If 10-20% → actions must be ["RESTART_SERVICE"]
-
-Return ONLY valid JSON, no explanation, no markdown:
-
-{
-  "errors": [{"code": "", "backend": "", "cause": "", "fix": "", "severity": "HIGH"}],
-  "actions": ["ROLLBACK"],
-  "risk": "HIGH",
-  "recommendation": ""
-}
+If >20 → ROLLBACK
+If <10 → IGNORE
+Else → RESTART_SERVICE
 
 Logs:
-${logs.map(l => `Status:${l.statusCode} Path:${l.path}`).join("\n")}
+${logs.map(l => `Status:${l.statusCode}`).join("\n")}
 
-Error Rate: ${errorRate}%
+Return JSON:
+{ "actions": ["ROLLBACK"] }
 `;
 
-      const res = await fetch(
-        "https://api.groq.com/openai/v1/chat/completions",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
-          },
-          body: JSON.stringify({
-            model: "llama-3.1-8b-instant",
-            messages: [{ role: "user", content: prompt }],
-            temperature: 0.2,
-          }),
-        }
-      );
+      const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: "llama-3.1-8b-instant",
+          messages: [{ role: "user", content: prompt }],
+          temperature: 0.7, // ✅ FIX
+        }),
+      });
 
       const data = await res.json();
-
       const content = data?.choices?.[0]?.message?.content;
+
       if (!content) return null;
 
       const raw = content.trim();
-      const start = raw.indexOf("{");
-      const end = raw.lastIndexOf("}");
-      if (start === -1 || end === -1) throw new Error("No JSON object found");
-      const cleaned = raw.substring(start, end + 1);
+      const json = raw.substring(raw.indexOf("{"), raw.lastIndexOf("}") + 1);
 
-      return JSON.parse(cleaned);
+      return JSON.parse(json);
+
     } catch (err) {
       console.error("[AI ERROR]", err.message);
       return null;
