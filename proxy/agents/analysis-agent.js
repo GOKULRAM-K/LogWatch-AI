@@ -1,102 +1,110 @@
 const { retrieveRelevantLogs } = require("../rag/retriever");
 const { runExecutionAgent } = require("./execute-actions");
 const { setAIState } = require("./ai-state");
+const EnhancedLogger = require("../enhanced-logger");
 
 async function runAnalysisAgent({ errorRate, stats }) {
   console.log("🧠 AnalysisAgent: starting analysis...");
 
   try {
     // ==============================
-    // STEP 1: Retrieve logs via RAG
+    // STEP 1: Get logs directly from logger (not just RAG)
     // ==============================
+    const logger = new EnhancedLogger();
+    const allLogs = logger.getTodayLogs() || [];
+
+    // Filter only error logs with real messages
+    const errorLogs = allLogs
+      .filter((l) => l.statusCode >= 400)
+      .slice(-50); // last 50 errors
+
     let relevantLogs = [];
 
     try {
       relevantLogs = await retrieveRelevantLogs(
         "errors failures crashes 500 502 503 504 timeout database db error exception"
       );
-      console.log("🔍 Logs retrieved:", relevantLogs.length);
+      console.log("🔍 RAG logs retrieved:", relevantLogs.length);
     } catch (e) {
       console.warn("[AnalysisAgent] RAG failed:", e.message);
     }
 
-    if (!relevantLogs || relevantLogs.length === 0) {
+    // Merge: prefer direct logs (they have responseBody), fallback to RAG
+    const combined = errorLogs.length > 0 ? errorLogs : relevantLogs;
+
+    if (!combined || combined.length === 0) {
       console.warn("[AnalysisAgent] No logs to analyze");
       return null;
     }
 
-    // ==============================
-    // STEP 1.1: FILTER IMPORTANT LOGS ONLY
-    // ==============================
-    const importantLogs = (relevantLogs || []).filter((l) => {
-      const code = l.statusCode;
-
-      return (
-        code >= 500 ||
-        code === 404 ||
-        (l.responseBody?.message &&
-          String(l.responseBody.message).toLowerCase().includes("error"))
-      );
-    });
-
-    const topLogs = importantLogs.slice(0, 20);
-
-    if (!topLogs.length) {
-      console.warn("[AnalysisAgent] No important logs found");
-      return null;
-    }
+    const topLogs = combined.slice(0, 20);
 
     // ==============================
-    // STEP 2: AI PROMPT (STRUCTURED INCIDENT REPORT)
+    // STEP 2: Build rich log summary for Groq
+    // ==============================
+    const logSummary = topLogs.map((l) => {
+      let msg = "Unknown";
+
+      if (typeof l.responseBody === "string") {
+        msg = l.responseBody;
+      } else if (l.responseBody?.message) {
+        msg = l.responseBody.message;
+      } else if (l.responseBody?.error) {
+        msg = l.responseBody.error;
+      }
+
+      return `Status:${l.statusCode} Path:${l.path || "/api"} Message:"${msg.substring(0, 150)}"`;
+    }).join("\n");
+
+    console.log("📋 Log summary for AI:\n", logSummary);
+
+    // ==============================
+    // STEP 3: AI PROMPT with real error messages
     // ==============================
     const prompt = `
 You are an autonomous SRE incident analysis agent.
 
-Analyze logs and return ONLY valid JSON.
+Analyze these REAL error logs and return ONLY valid JSON.
 
 RULES:
-- You MUST output exactly 4 error entries in the array. If there are fewer than 4 distinct real errors, creatively extract minor issues, performance warnings, database context, or break down the main error into multiple sub-issues to guarantee AT LEAST 4 errors are returned.
+- You MUST output exactly 4 error entries in the array
+- Use the EXACT error messages from the logs below — do NOT be generic
+- Each error entry must reference the specific error message seen in logs
 - Rank by severity (HIGH first)
-- Never return fewer than 4 errors. Provide realistic SRE insights for any padded errors.
-- Do NOT output any words, markdown, or conversational text before or after the JSON. Return ONLY the JSON object starting with { and ending with }.
+- Do NOT output any words, markdown, or text before or after the JSON
 
 STRICT FORMAT:
-
 {
   "errors": [
     {
-      "code": "",
-      "backend": "",
-      "cause": "",
-      "fix": "",
+      "code": "500",
+      "backend": "test",
+      "cause": "specific cause based on the actual log message",
+      "fix": "specific fix for this exact error",
       "severity": "LOW | MEDIUM | HIGH"
     }
   ],
   "actions": ["ROLLBACK", "RESTART_SERVICE", "IGNORE"],
   "risk": "LOW | MEDIUM | HIGH",
-  "recommendation": ""
+  "recommendation": "specific recommendation based on actual errors seen"
 }
 
 IMPORTANT RULES:
 - If errorRate > 20 → include "ROLLBACK"
 - If repeated 500 errors → include "RESTART_SERVICE"
 - Always include at least one action
+- "cause" and "fix" MUST reference the actual error messages below, not generic text
 
-LOGS:
-${topLogs
-        .map(
-          (l) =>
-            `Status:${l.statusCode} Path:${l.path} Msg:${l.responseBody?.message ||
-            (typeof l.responseBody === "string" ? l.responseBody : "Unknown")
-            }`
-        )
-        .join("\n")}
+ACTUAL ERROR LOGS:
+${logSummary}
 
 Error Rate: ${errorRate}%
+Total Requests: ${stats.totalRequests}
+Total Errors: ${stats.totalErrors}
 `;
 
     // ==============================
-    // STEP 3: CALL GROQ
+    // STEP 4: CALL GROQ
     // ==============================
     const response = await fetch(
       "https://api.groq.com/openai/v1/chat/completions",
@@ -122,7 +130,7 @@ Error Rate: ${errorRate}%
     }
 
     // ==============================
-    // STEP 4: SAFE JSON PARSE
+    // STEP 5: SAFE JSON PARSE
     // ==============================
     let ai;
 
@@ -147,7 +155,7 @@ Error Rate: ${errorRate}%
     console.log("🧠 AI Decision:\n", JSON.stringify(ai, null, 2));
 
     // ==============================
-    // STEP 5: UPDATE AI STATE (FOR UI)
+    // STEP 6: UPDATE AI STATE
     // ==============================
     setAIState({
       ...ai,
@@ -158,7 +166,7 @@ Error Rate: ${errorRate}%
     });
 
     // ==============================
-    // STEP 6: EXECUTE ACTIONS
+    // STEP 7: EXECUTE ACTIONS
     // ==============================
     await runExecutionAgent({
       actions: ai.actions,
@@ -171,9 +179,6 @@ Error Rate: ${errorRate}%
 
     console.log("✅ AnalysisAgent complete → ExecutionAgent triggered");
 
-    // ==============================
-    // STEP 7: RETURN RESULT (IMPORTANT)
-    // ==============================
     return ai;
 
   } catch (err) {
