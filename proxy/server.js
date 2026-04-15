@@ -29,7 +29,7 @@ const triggerAgent = new TriggerAgent(errorTracker, {
 // ================= MIDDLEWARE =================
 app.use(express.json());
 
-// 🔥 FULL CORS FIX (VERY IMPORTANT)
+// ✅ FIXED CORS (FINAL)
 app.use((req, res, next) => {
   res.header("Access-Control-Allow-Origin", "https://logwatchai.vercel.app");
   res.header(
@@ -48,11 +48,9 @@ app.use((req, res, next) => {
   next();
 });
 
-// Disable caching (fix 304 issue)
+// Disable caching
 app.use("/api", (req, res, next) => {
-  res.set("Cache-Control", "no-store, no-cache, must-revalidate");
-  res.set("Pragma", "no-cache");
-  res.set("Expires", "0");
+  res.set("Cache-Control", "no-store");
   next();
 });
 
@@ -80,24 +78,19 @@ const saveConfig = (config) => {
 };
 
 // ================= ROUTES =================
-
-// HEALTH (must come BEFORE proxy)
 app.get("/health", (req, res) => {
   res.json({ status: "ok", uptime: process.uptime() });
 });
 
-// STATS
 app.get("/api/stats", (req, res) => {
   res.json(errorTracker.getStats());
 });
 
-// LOGS
 app.get("/api/logs", (req, res) => {
   const logs = logger.getTodayLogs();
   res.json({ logs: logs || [] });
 });
 
-// CONFIG
 app.get("/api/config", (req, res) => {
   res.json(getConfig());
 });
@@ -116,7 +109,6 @@ app.post("/api/config", (req, res) => {
   res.json({ success: true });
 });
 
-// ROLLBACK HISTORY
 app.get("/api/rollback-history", (req, res) => {
   try {
     const history = autoRollback.getRollbackHistory();
@@ -126,7 +118,6 @@ app.get("/api/rollback-history", (req, res) => {
   }
 });
 
-// AI STATE
 app.get("/api/ai/state", (req, res) => {
   res.json({ success: true, data: getAIState() });
 });
@@ -162,7 +153,7 @@ app.post("/api/analyze", async (req, res) => {
 proxy.on("proxyRes", (proxyRes, req, res) => {
   let body = [];
 
-  // 🔥 FORCE CORS HEADERS ON PROXY RESPONSES
+  // ✅ Force CORS on proxy responses
   proxyRes.headers["Access-Control-Allow-Origin"] =
     "https://logwatchai.vercel.app";
 
@@ -179,7 +170,7 @@ proxy.on("proxyRes", (proxyRes, req, res) => {
 });
 
 // ================= PROXY =================
-app.use("*", (req, res) => {
+app.use((req, res) => {
   const config = getConfig();
 
   let target;
@@ -197,7 +188,6 @@ app.use("*", (req, res) => {
   console.log(`🔥 TARGET: ${target}`);
   console.log(`➡️ ${req.method} ${req.path}`);
 
-  // Fix headers for Render
   req.headers["x-forwarded-host"] = req.headers.host;
   req.headers["x-forwarded-proto"] = "https";
 
