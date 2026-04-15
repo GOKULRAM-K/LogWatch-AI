@@ -29,7 +29,7 @@ const triggerAgent = new TriggerAgent(errorTracker, {
 // ================= MIDDLEWARE =================
 app.use(express.json());
 
-// ✅ CORS FIX
+// ✅ CORS
 app.use((req, res, next) => {
   res.header("Access-Control-Allow-Origin", "https://logwatchai.vercel.app");
   res.header(
@@ -139,29 +139,6 @@ app.post("/api/analyze", async (req, res) => {
   }
 });
 
-// ================= PROXY RESPONSE CAPTURE =================
-proxy.on("proxyRes", (proxyRes, req, res) => {
-  let body = [];
-
-  // 🔥 FIX: capture REAL backend status
-  req.actualStatusCode = proxyRes.statusCode;
-
-  // ✅ Force CORS headers on proxy responses
-  proxyRes.headers["Access-Control-Allow-Origin"] =
-    "https://logwatchai.vercel.app";
-
-  proxyRes.on("data", (chunk) => body.push(chunk));
-
-  proxyRes.on("end", () => {
-    try {
-      const raw = Buffer.concat(body).toString();
-      req.responseBody = JSON.parse(raw);
-    } catch {
-      req.responseBody = Buffer.concat(body).toString();
-    }
-  });
-});
-
 // ================= PROXY =================
 app.use((req, res) => {
   const config = getConfig();
@@ -178,11 +155,9 @@ app.use((req, res) => {
     target = config.stable_url;
   }
 
-  console.log(`🔥 TARGET: ${target}`);
-  console.log(`➡️ ${req.method} ${req.path}`);
+  req.target = target;
 
-  req.headers["x-forwarded-host"] = req.headers.host;
-  req.headers["x-forwarded-proto"] = "https";
+  console.log(`➡️ ${req.method} ${req.path} → ${target}`);
 
   proxy.web(req, res, {
     target,
@@ -190,24 +165,36 @@ app.use((req, res) => {
     secure: true,
     timeout: 30000,
   });
+});
 
-  res.on("finish", async () => {
-    const duration = Date.now() - req.startTime;
+// ================= PROXY RESPONSE (FIXED CORE) =================
+proxy.on("proxyRes", (proxyRes, req, res) => {
+  let body = [];
+  const status = proxyRes.statusCode || 200;
 
-    // 🔥 USE REAL STATUS
-    const status = req.actualStatusCode || res.statusCode || 200;
+  console.log("📡 REAL STATUS:", status);
 
-    console.log("📡 BACKEND STATUS:", req.actualStatusCode);
-    console.log("📡 FINAL STATUS:", res.statusCode);
+  proxyRes.on("data", (chunk) => body.push(chunk));
 
-    // LOGGING
+  proxyRes.on("end", async () => {
+    let responseBody;
+
     try {
-      logger.logRequest(req, res, duration, target, status, req.responseBody);
+      responseBody = JSON.parse(Buffer.concat(body).toString());
+    } catch {
+      responseBody = Buffer.concat(body).toString();
+    }
+
+    const duration = Date.now() - (req.startTime || Date.now());
+
+    // ================= LOGGING =================
+    try {
+      logger.logRequest(req, res, duration, req.target, status, responseBody);
     } catch (e) {
       console.error("Logger error:", e.message);
     }
 
-    // TRACK ERRORS
+    // ================= ERROR TRACKING =================
     errorTracker.addRequest(status);
 
     const stats = errorTracker.getStats();
@@ -215,14 +202,14 @@ app.use((req, res) => {
 
     console.log(`📊 ${status} | errorRate: ${errorRate}%`);
 
-    // INGEST ERRORS
+    // ================= INGEST =================
     if (status >= 400) {
       try {
         await ingestLogs([
           {
             statusCode: status,
             path: req.path,
-            responseBody: req.responseBody,
+            responseBody,
           },
         ]);
         console.log("📥 Error ingested");
@@ -231,12 +218,12 @@ app.use((req, res) => {
       }
     }
 
-    // TRIGGER AI
+    // ================= AI TRIGGER =================
     try {
       await triggerAgent.observe({
         statusCode: status,
         path: req.path,
-        responseBody: req.responseBody,
+        responseBody,
         errorRate,
         autoRollback,
       });
