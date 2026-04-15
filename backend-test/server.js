@@ -7,24 +7,13 @@ const randomFail = () => Math.random() < 0.4;
 
 app.get("/api", (req, res) => {
   if (randomFail()) {
-    return res.status(500).json({
-      error: "Internal Server Error",
-      message: "Database connection pool exhausted",
-      timestamp: new Date().toISOString(),
-      details: { pool_size: 10, active_connections: 10, waiting: 5 }
-    });
+    return res.status(500).json({ error: "Internal Server Error", message: "Database connection pool exhausted", timestamp: new Date().toISOString(), details: { pool_size: 10, active_connections: 10, waiting: 5 } });
   }
   res.json({ status: "ok", backend: "test", latency: Math.random() * 100 });
 });
 
 app.get("/error/db-pool", (req, res) => {
   res.status(503).json({ error: "Service Unavailable", message: "Database connection pool exhausted - all 50 connections in use", timestamp: new Date().toISOString(), details: { service: "MySQL Connection Pool", available: 0, total: 50, in_use: 50, waiting_requests: 12 } });
-});
-
-app.get("/error/query-timeout", (req, res) => {
-  setTimeout(() => {
-    res.status(504).json({ error: "Gateway Timeout", message: "Query execution exceeded 30s timeout", timestamp: new Date().toISOString(), details: { query: "SELECT * FROM users JOIN orders ON users.id = orders.user_id WHERE status='pending'", timeout_ms: 30000, query_type: "JOIN", tables: ["users", "orders"], estimated_rows: 5000000 } });
-  }, 35000);
 });
 
 app.get("/error/constraint", (req, res) => {
@@ -60,7 +49,7 @@ app.get("/error/validation", (req, res) => {
 });
 
 app.get("/error/external-timeout", (req, res) => {
-  res.status(504).json({ error: "Gateway Timeout", message: "External payment API timeout after 10s - service.payment.com", timestamp: new Date().toISOString(), details: { service: "Stripe Payment API", endpoint: "https://api.stripe.com/v1/charges", timeout: 10000, attempts: 2 } });
+  res.status(504).json({ error: "Gateway Timeout", message: "External payment API timeout after 10s", timestamp: new Date().toISOString(), details: { service: "Stripe Payment API", endpoint: "https://api.stripe.com/v1/charges", timeout: 10000, attempts: 2 } });
 });
 
 app.get("/error/cache-miss", (req, res) => {
@@ -71,21 +60,15 @@ let cascadeCount = 0;
 app.get("/error/cascade", (req, res) => {
   cascadeCount++;
   if (cascadeCount > 5) {
-    return res.status(503).json({ error: "Service Unavailable", message: "System degradation - multiple service failures detected", timestamp: new Date().toISOString(), details: { failed_services: ["Database: Connection Pool Exhausted", "Cache: Redis Down", "Queue: RabbitMQ Overloaded", "Logging: Disk Space Low"], affected_requests: cascadeCount, auto_recovery: "in_progress" } });
+    return res.status(503).json({ error: "Service Unavailable", message: "System degradation - multiple service failures detected", timestamp: new Date().toISOString(), details: { failed_services: ["Database", "Cache", "Queue", "Logging"], affected_requests: cascadeCount, auto_recovery: "in_progress" } });
   }
   res.json({ status: "ok", cascade_count: cascadeCount });
-});
-
-app.get("/error/slow-response", (req, res) => {
-  setTimeout(() => {
-    res.status(504).json({ error: "Gateway Timeout", message: "Request timeout after 45s - processing complex analytics query", timestamp: new Date().toISOString(), details: { operation: "Calculate monthly revenue by region", data_points: 5000000, processing_time: 45000, expected_time: 5000 } });
-  }, 45000);
 });
 
 app.get("/error/partial", (req, res) => {
   const random = Math.random();
   if (random < 0.3) {
-    return res.status(500).json({ error: "Internal Server Error", message: "Database connection timeout - unable to execute query", timestamp: new Date().toISOString() });
+    return res.status(500).json({ error: "Internal Server Error", message: "Database connection timeout", timestamp: new Date().toISOString() });
   } else if (random < 0.6) {
     return res.status(503).json({ error: "Service Unavailable", message: "Service temporarily degraded - retry after 30 seconds", timestamp: new Date().toISOString() });
   } else if (random < 0.9) {
@@ -99,18 +82,13 @@ app.get("/health", (req, res) => {
 });
 
 app.all("*splat", (req, res) => {
-  if (Math.random() < 0.4) {
-    return res.status(500).json({
-      error: "Internal Server Error",
-      message: "Database connection pool exhausted",
-      timestamp: new Date().toISOString(),
-      details: { pool_size: 10, active_connections: 10, waiting: 5 }
-    });
+  if (randomFail()) {
+    return res.status(500).json({ error: "Internal Server Error", message: "Database connection pool exhausted", timestamp: new Date().toISOString(), details: { pool_size: 10, active_connections: 10, waiting: 5 } });
   }
   res.json({ status: "ok", backend: "test", latency: Math.random() * 100 });
 });
 
 const PORT = process.env.PORT || 5002;
 app.listen(PORT, () => {
-  console.log(`\n🧪 TEST BACKEND running on port ${PORT}`);
+  console.log(`TEST BACKEND running on port ${PORT}`);
 });

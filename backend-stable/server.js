@@ -8,22 +8,14 @@ app.get("/health", (req, res) => {
 });
 
 app.get("/api", (req, res) => {
-  res.json({
-    backend: "stable",
-    message: "Everything working perfectly"
-  });
+  res.json({ backend: "stable", message: "Everything working perfectly" });
 });
 
 app.all("*splat", (req, res) => {
-  res.json({
-    backend: "stable",
-    message: "Everything working perfectly",
-    method: req.method,
-    path: req.path
-  });
+  res.json({ backend: "stable", message: "Everything working perfectly", method: req.method, path: req.path });
 });
 
 const PORT = process.env.PORT || 5001;
 app.listen(PORT, () => {
-  console.log(`✅ Stable backend running on port ${PORT}.`);
+  console.log(`Stable backend running on port ${PORT}`);
 });
