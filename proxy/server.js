@@ -1,7 +1,6 @@
 const express = require("express");
 const httpProxy = require("http-proxy");
 const fs = require("fs");
-const cors = require("cors");
 require("dotenv").config();
 
 const EnhancedLogger = require("./enhanced-logger");
@@ -30,16 +29,30 @@ const triggerAgent = new TriggerAgent(errorTracker, {
 // ================= MIDDLEWARE =================
 app.use(express.json());
 
-app.use(
-  cors({
-    origin: "*",
-  })
-);
+// 🔥 FULL CORS FIX (VERY IMPORTANT)
+app.use((req, res, next) => {
+  res.header("Access-Control-Allow-Origin", "https://logwatchai.vercel.app");
+  res.header(
+    "Access-Control-Allow-Methods",
+    "GET, POST, PUT, DELETE, OPTIONS, PATCH"
+  );
+  res.header(
+    "Access-Control-Allow-Headers",
+    "Content-Type, Authorization"
+  );
 
-// Disable caching (fixes 304 issue)
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(200);
+  }
+
+  next();
+});
+
+// Disable caching (fix 304 issue)
 app.use("/api", (req, res, next) => {
   res.set("Cache-Control", "no-store, no-cache, must-revalidate");
   res.set("Pragma", "no-cache");
+  res.set("Expires", "0");
   next();
 });
 
@@ -93,10 +106,24 @@ app.post("/api/config", (req, res) => {
   const { mode } = req.body;
   const config = getConfig();
 
+  if (!["stable", "test", "canary"].includes(mode)) {
+    return res.status(400).json({ error: "Invalid mode" });
+  }
+
   config.mode = mode;
   saveConfig(config);
 
   res.json({ success: true });
+});
+
+// ROLLBACK HISTORY
+app.get("/api/rollback-history", (req, res) => {
+  try {
+    const history = autoRollback.getRollbackHistory();
+    res.json({ success: true, history });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch history" });
+  }
 });
 
 // AI STATE
@@ -134,6 +161,10 @@ app.post("/api/analyze", async (req, res) => {
 // ================= PROXY RESPONSE CAPTURE =================
 proxy.on("proxyRes", (proxyRes, req, res) => {
   let body = [];
+
+  // 🔥 FORCE CORS HEADERS ON PROXY RESPONSES
+  proxyRes.headers["Access-Control-Allow-Origin"] =
+    "https://logwatchai.vercel.app";
 
   proxyRes.on("data", (chunk) => body.push(chunk));
 
@@ -180,14 +211,19 @@ app.use("*", (req, res) => {
   res.on("finish", async () => {
     const duration = Date.now() - req.startTime;
 
-    // LOGGING
     try {
-      logger.logRequest(req, res, duration, target, res.statusCode, req.responseBody);
+      logger.logRequest(
+        req,
+        res,
+        duration,
+        target,
+        res.statusCode,
+        req.responseBody
+      );
     } catch (e) {
       console.error("Logger error:", e.message);
     }
 
-    // TRACK ERRORS
     errorTracker.addRequest(res.statusCode);
 
     const stats = errorTracker.getStats();
@@ -195,7 +231,6 @@ app.use("*", (req, res) => {
 
     console.log(`📊 ${res.statusCode} | errorRate: ${errorRate}%`);
 
-    // INGEST ERRORS
     if (res.statusCode >= 400) {
       try {
         await ingestLogs([
@@ -211,7 +246,6 @@ app.use("*", (req, res) => {
       }
     }
 
-    // TRIGGER AI
     try {
       await triggerAgent.observe({
         statusCode: res.statusCode,
@@ -246,7 +280,6 @@ const PORT = process.env.PORT || 4000;
 app.listen(PORT, async () => {
   console.log(`🚀 Server running on port ${PORT}`);
 
-  // Seed Pinecone
   try {
     await ingestLogs([
       {
