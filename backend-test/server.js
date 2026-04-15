@@ -97,8 +97,8 @@ app.get("/error/partial", (req, res) => {
 app.get("/health", (req, res) => {
   res.json({ status: "healthy", backend: "test", timestamp: new Date().toISOString() });
 });
-// ========== CATCH ALL OTHER ROUTES ==========
-app.all("*", (req, res) => {
+
+app.all("*splat", (req, res) => {
   if (Math.random() < 0.4) {
     return res.status(500).json({
       error: "Internal Server Error",

@@ -3,12 +3,10 @@ const app = express();
 
 app.use(express.json());
 
-// ========== HEALTH CHECK ==========
 app.get("/health", (req, res) => {
   res.json({ status: "healthy", backend: "stable", timestamp: new Date().toISOString() });
 });
 
-// ========== API ENDPOINT ==========
 app.get("/api", (req, res) => {
   res.json({
     backend: "stable",
@@ -16,8 +14,7 @@ app.get("/api", (req, res) => {
   });
 });
 
-// ========== CATCH ALL OTHER ROUTES ==========
-app.all("*", (req, res) => {
+app.all("*splat", (req, res) => {
   res.json({
     backend: "stable",
     message: "Everything working perfectly",
