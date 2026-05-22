@@ -23,12 +23,12 @@ Analyze logs in real time
 Identify anomalies and failure patterns
 Provide contextual insights
 
-%% 🤖 Autonomous AI Agents
+## 🤖 Autonomous AI Agents
 AI agents continuously monitor system health
 Detect failures without manual intervention
 Trigger automated recovery workflows
 
-##⚡ Instant Rollback & Recovery
+## ⚡Instant Rollback & Recovery
 Automatically rolls back to stable versions on failure detection
 Minimizes downtime and user impact
 
