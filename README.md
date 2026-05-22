@@ -1,8 +1,8 @@
-🚀## AI-Powered System Reliability Platform
+## 🚀 AI-Powered System Reliability Platform
 
 An intelligent, self-healing platform designed for real-time system reliability and safe deployments. This project leverages AI to monitor, analyze, and automatically respond to system failures — ensuring resilience, stability, and minimal downtime.
 
-🌟 Overview
+## 🌟 Overview
 
 Modern distributed systems are complex and prone to failures. This platform combines:
 
@@ -12,7 +12,7 @@ Autonomous AI agents
 
 to proactively detect issues and take corrective actions such as instant rollback or recovery, enabling self-healing systems.
 
-⚙️ Key Features
+## ⚙️ Key Features
 🔄 Real-Time Traffic Routing
 Dynamically routes traffic between stable and test backends
 Enables safe deployments (canary / blue-green strategies)
@@ -23,16 +23,16 @@ Analyze logs in real time
 Identify anomalies and failure patterns
 Provide contextual insights
 
-🤖 Autonomous AI Agents
+%% 🤖 Autonomous AI Agents
 AI agents continuously monitor system health
 Detect failures without manual intervention
 Trigger automated recovery workflows
 
-⚡ Instant Rollback & Recovery
+##⚡ Instant Rollback & Recovery
 Automatically rolls back to stable versions on failure detection
 Minimizes downtime and user impact
 
-📊 Observability & Monitoring
+## 📊 Observability & Monitoring
 Track:
 Request trends
 Error rates
