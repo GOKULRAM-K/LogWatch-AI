@@ -1,4 +1,4 @@
-🚀 ## AI-Powered System Reliability Platform
+🚀## AI-Powered System Reliability Platform
 
 An intelligent, self-healing platform designed for real-time system reliability and safe deployments. This project leverages AI to monitor, analyze, and automatically respond to system failures — ensuring resilience, stability, and minimal downtime.
 
@@ -17,7 +17,7 @@ to proactively detect issues and take corrective actions such as instant rollbac
 Dynamically routes traffic between stable and test backends
 Enables safe deployments (canary / blue-green strategies)
 
-🧠 RAG-Based Log Analysis
+## 🧠 RAG-Based Log Analysis
 Uses Retrieval-Augmented Generation (RAG) to:
 Analyze logs in real time
 Identify anomalies and failure patterns
