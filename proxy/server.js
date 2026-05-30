@@ -193,7 +193,7 @@ proxy.on("proxyRes", (proxyRes, req, res) => {
 
     const duration = Date.now() - (req.startTime || Date.now());
 
-    metricsTracker.recordRequest();
+    metricsTracker.recordRequest(status);
 
     // ================= LOGGING =================
     try {

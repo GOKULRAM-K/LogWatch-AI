@@ -1,13 +1,23 @@
 class MetricsTracker{
     constructor(){
         this.totalRequests=0;
+        this.successCount=0;
+        this.failureCount=0;
     }
-recordRequest() {
+recordRequest(StatusCode) {
     this.totalRequests++;
+
+    if(StatusCode>=400){
+        this.failureCount++;
+    }else{
+        this.successCount++;
+    }
 }
 getMetrics() {
     return {
-        totalRequests: this.totalRequests
+        totalRequests: this.totalRequests,
+        successCount:this.successCount,
+        failureCount: this.failureCount
     };
 }
 }
